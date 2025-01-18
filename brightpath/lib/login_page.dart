@@ -8,6 +8,8 @@ import 'package:firebase_dynamic_links/firebase_dynamic_links.dart';
 
 import 'profile_page.dart';
 import 'register_page.dart';
+import 'post_page.dart';
+
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -21,84 +23,107 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _passwordController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
-  int? _hoveredIndex;
+  final _formKey = GlobalKey<FormState>();
+
+  String? _validateEmail(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Email is required';
+    }
+    final emailRegex = RegExp(r'^[\w-]+(\.[\w-]+)*@([\w-]+\.)+[a-zA-Z]{2,7}$');
+    if (!emailRegex.hasMatch(value)) {
+      return 'Please enter a valid email address';
+    }
+    return null;
+  }
+
+  String? _validatePassword(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Password is required';
+    }
+    if (value.length < 6) {
+      return 'Password must be at least 6 characters';
+    }
+    return null;
+  }
 
   Future<void> _login() async {
-    try {
-      UserCredential userCredential = await _auth.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
-      
-      if (userCredential.user != null) {
-        // Reload the user to get the latest email verification status
-        await userCredential.user!.reload();
-        User? user = _auth.currentUser;
+    if (_formKey.currentState!.validate()) {
+      try {
+        UserCredential userCredential = await _auth.signInWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text.trim(),
+        );
+        
+        if (userCredential.user != null) {
+          // Reload the user to get the latest email verification status
+          await userCredential.user!.reload();
+          User? user = _auth.currentUser;
 
-        if (user != null && user.emailVerified) {
-          // User is verified in Firebase Auth, update Firestore
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .set({'verified': true}, SetOptions(merge: true));
-              
-          // Show success message
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Login successful!'),
-              duration: Duration(seconds: 2),
-            ),
-          );
-
-          // Navigate to profile page only on successful login
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const ProfilePage()),
-          );
-        } else if (user != null) {
-          // Send verification email if not verified
-          await userCredential.user!.sendEmailVerification();
-          // Show verification dialog
-          await showDialog(
-            context: context,
-            builder: (BuildContext context) {
-              return AlertDialog(
-                title: const Text('Email Verification Required'),
-                content: const Text('Please verify your email address. A verification link has been sent to your email.'),
-                actions: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                    child: const Text('OK'),
-                  ),
-                ],
-              );
-            },
-          );
-          // Do not navigate to profile page if email is not verified
-        }
-      }
-    } catch (e) {
-      // Show error dialog
-      await showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: const Text('Login Error'),
-            content: Text(e.toString()),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-                child: const Text('OK'),
+          if (user != null && user.emailVerified) {
+            // User is verified in Firebase Auth, update Firestore
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .set({'verified': true}, SetOptions(merge: true));
+                
+            // Show success message
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Login successful!'),
+                duration: Duration(seconds: 2),
               ),
-            ],
-          );
-        },
-      );
-      // Do not navigate to profile page on error
+            );
+
+            // Navigate to profile page only on successful login
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const PostPage(initialPostIndex: 0)),
+            );
+          } else if (user != null) {
+            // Send verification email if not verified
+            await userCredential.user!.sendEmailVerification();
+            // Show verification dialog
+            await showDialog(
+              context: context,
+              builder: (BuildContext context) {
+                return AlertDialog(
+                  title: const Text('Email Verification Required'),
+                  content: const Text('Please verify your email address. A verification link has been sent to your email.'),
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                      child: const Text('OK'),
+                    ),
+                  ],
+                );
+              },
+            );
+            // Do not navigate to profile page if email is not verified
+          }
+        }
+      } catch (e) {
+        // Show error dialog
+        await showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('Login Error'),
+              content: Text(e.toString()),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('OK'),
+                ),
+              ],
+            );
+          },
+        );
+        // Do not navigate to profile page on error
+      }
     }
   }
 
@@ -122,16 +147,6 @@ class _LoginPageState extends State<LoginPage> {
       // Handle error (e.g., show a dialog)
       print(e);
     }
-  }
-
-  void _showLoginRequiredMessage() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Please login first to access this feature'),
-        duration: Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
   }
 
   Future<bool> _checkUserVerification(String userId) async {
@@ -326,98 +341,125 @@ class _LoginPageState extends State<LoginPage> {
                       ],
                     ),
                     padding: const EdgeInsets.all(24),
-                    child: Column(
-                      children: [
-                        // Email Field
-                        TextField(
-                          controller: _emailController,
-                          decoration: InputDecoration(
-                            labelText: 'Email',
-                            labelStyle: TextStyle(color: Colors.grey[600]),
-                            prefixIcon: Icon(Icons.email_outlined, color: Colors.blue[600]),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey[300]!),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        children: [
+                          // Email Field
+                          TextFormField(
+                            controller: _emailController,
+                            validator: _validateEmail,
+                            autovalidateMode: AutovalidateMode.onUserInteraction,
+                            decoration: InputDecoration(
+                              labelText: 'Email',
+                              labelStyle: TextStyle(color: Colors.grey[600]),
+                              prefixIcon: Icon(Icons.email_outlined, color: Colors.blue[600]),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.grey[300]!),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.grey[300]!),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.blue[600]!, width: 2),
+                              ),
+                              errorBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(color: Colors.red, width: 1),
+                              ),
+                              focusedErrorBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(color: Colors.red, width: 2),
+                              ),
+                              filled: true,
+                              fillColor: Colors.grey[50],
                             ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey[300]!),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.blue[600]!, width: 2),
-                            ),
-                            filled: true,
-                            fillColor: Colors.grey[50],
+                            keyboardType: TextInputType.emailAddress,
+                            textInputAction: TextInputAction.next,
                           ),
-                        ),
-                        const SizedBox(height: 16),
-                        // Password Field
-                        TextField(
-                          controller: _passwordController,
-                          obscureText: true,
-                          decoration: InputDecoration(
-                            labelText: 'Password',
-                            labelStyle: TextStyle(color: Colors.grey[600]),
-                            prefixIcon: Icon(Icons.lock_outline, color: Colors.blue[600]),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey[300]!),
+                          const SizedBox(height: 16),
+                          // Password Field
+                          TextFormField(
+                            controller: _passwordController,
+                            validator: _validatePassword,
+                            autovalidateMode: AutovalidateMode.onUserInteraction,
+                            obscureText: true,
+                            decoration: InputDecoration(
+                              labelText: 'Password',
+                              labelStyle: TextStyle(color: Colors.grey[600]),
+                              prefixIcon: Icon(Icons.lock_outline, color: Colors.blue[600]),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.grey[300]!),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.grey[300]!),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.blue[600]!, width: 2),
+                              ),
+                              errorBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(color: Colors.red, width: 1),
+                              ),
+                              focusedErrorBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(color: Colors.red, width: 2),
+                              ),
+                              filled: true,
+                              fillColor: Colors.grey[50],
                             ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey[300]!),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.blue[600]!, width: 2),
-                            ),
-                            filled: true,
-                            fillColor: Colors.grey[50],
+                            textInputAction: TextInputAction.done,
+                            onFieldSubmitted: (_) => _login(),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        // Forgot Password Button
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: () {
-                              // Handle forgot password
-                            },
-                            style: TextButton.styleFrom(
-                              foregroundColor: Colors.blue[700],
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                          const SizedBox(height: 8),
+                          // Forgot Password Button
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: () {
+                                // Handle forgot password
+                              },
+                              style: TextButton.styleFrom(
+                                foregroundColor: Colors.blue[700],
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                              ),
+                              child: const Text(
+                                'Forgot Password?',
+                                style: TextStyle(fontWeight: FontWeight.w500),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          // Sign In Button
+                          ElevatedButton(
+                            onPressed: _login,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue[700],
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              minimumSize: const Size(double.infinity, 50),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 2,
                             ),
                             child: const Text(
-                              'Forgot Password?',
-                              style: TextStyle(fontWeight: FontWeight.w500),
+                              'Sign In',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.5,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 24),
-                        // Sign In Button
-                        ElevatedButton(
-                          onPressed: _login,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue[700],
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            minimumSize: const Size(double.infinity, 50),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 2,
-                          ),
-                          child: const Text(
-                            'Sign In',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: 32),
@@ -477,7 +519,8 @@ class _LoginPageState extends State<LoginPage> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Container(
+                          Image.asset(
+                            'assets/google_icon.png',
                             width: 24,
                             height: 24,
                           ),
@@ -540,124 +583,6 @@ class _LoginPageState extends State<LoginPage> {
           ),
         ),
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 20,
-              offset: const Offset(0, -5),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.blue.withOpacity(0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
-              ),
-              child: MouseRegion(
-                onHover: (event) {
-                  final RenderBox box = context.findRenderObject() as RenderBox;
-                  final position = box.globalToLocal(event.position);
-                  final width = box.size.width;
-                  final index = (position.dx / (width / 5)).floor();
-                  setState(() {
-                    _hoveredIndex = index;
-                  });
-                },
-                onExit: (event) {
-                  setState(() {
-                    _hoveredIndex = null;
-                  });
-                },
-                child: BottomNavigationBar(
-                  items: _buildNavItems(),
-                  currentIndex: 2,
-                  selectedItemColor: Colors.blue[700],
-                  unselectedItemColor: Colors.grey[400],
-                  showUnselectedLabels: true,
-                  type: BottomNavigationBarType.fixed,
-                  backgroundColor: Colors.transparent,
-                  elevation: 0,
-                  selectedFontSize: 12,
-                  unselectedFontSize: 12,
-                  onTap: (index) => _showLoginRequiredMessage(),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
-
-  List<BottomNavigationBarItem> _buildNavItems() {
-    final items = [
-      NavItem(Icons.home_rounded, Icons.home_outlined, 'Home'),
-      NavItem(Icons.group_rounded, Icons.group_outlined, 'Community'),
-      NavItem(Icons.add_circle_rounded, Icons.add_circle_outlined, 'Report'),
-      NavItem(Icons.notifications_rounded, Icons.notifications_outlined, 'Alerts'),
-      NavItem(Icons.person_rounded, Icons.person_outlined, 'Profile'),
-    ];
-
-    return items.asMap().entries.map((entry) {
-      final index = entry.key;
-      final item = entry.value;
-      final isHovered = _hoveredIndex == index;
-      final isSelected = 2 == index;
-
-      return BottomNavigationBarItem(
-        icon: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: EdgeInsets.all(isHovered || isSelected ? 8.0 : 6.0),
-          decoration: BoxDecoration(
-            color: isSelected 
-                ? Colors.blue[700] 
-                : isHovered 
-                    ? Colors.blue[50] 
-                    : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: isSelected || isHovered
-                ? [
-                    BoxShadow(
-                      color: Colors.blue.withOpacity(0.1),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Icon(
-            isSelected || isHovered ? item.selectedIcon : item.icon,
-            size: isHovered || isSelected ? 28 : 24,
-            color: isSelected 
-                ? Colors.white 
-                : isHovered 
-                    ? Colors.blue[700] 
-                    : Colors.grey[400],
-          ),
-        ),
-        label: item.label,
-      );
-    }).toList();
-  }
-}
-
-class NavItem {
-  final IconData selectedIcon;
-  final IconData icon;
-  final String label;
-
-  NavItem(this.selectedIcon, this.icon, this.label);
 } 
