@@ -1,3 +1,4 @@
+import 'package:brightpath/community_listing_page.dart';
 import 'package:brightpath/home_page.dart';
 import 'package:brightpath/profile_page.dart';
 import 'package:brightpath/report_page.dart';
@@ -203,8 +204,11 @@ class _CommunityPageState extends State<CommunityPage> {
                     ),
                     _buildGridItem(
                       'Community',
-                      Icons.groups_outlined,
-                      () => _showListFromFirebase('communities'),
+                      Icons.school_outlined,
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const CommunityListingPage()),
+                      ),
                     ),
                     _buildGridItem(
                       'Rehabs',
