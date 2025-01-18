@@ -141,7 +141,7 @@ class _LoginPageState extends State<LoginPage> {
       // Navigate to profile page
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const ProfilePage()),
+        MaterialPageRoute(builder: (context) => const PostPage(initialPostIndex: 0,)),
       );
     } catch (e) {
       // Handle error (e.g., show a dialog)
@@ -196,7 +196,7 @@ class _LoginPageState extends State<LoginPage> {
             // Navigate to profile page
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (context) => const ProfilePage()),
+              MaterialPageRoute(builder: (context) => const PostPage(initialPostIndex: 0,)),
             );
           }
         }
@@ -228,7 +228,7 @@ class _LoginPageState extends State<LoginPage> {
         // Navigate to profile page
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const ProfilePage()),
+          MaterialPageRoute(builder: (context) => const PostPage(initialPostIndex: 0,)),
         );
       } else {
         // Optionally, show a message that the user is still not verified

@@ -54,14 +54,19 @@ class _PostPageState extends State<PostPage> {
 
       final posts = await Future.wait(snapshot.docs.map((doc) async {
         final data = doc.data();
+        
         // Fetch user data if userId exists
         if (data['userId'] != null) {
           final userDoc = await FirebaseFirestore.instance
               .collection('users')
               .doc(data['userId'])
               .get();
+            
           if (userDoc.exists) {
-            data['userName'] = userDoc.data()?['username'] ?? data['userId'];
+            // Get the user's name from Firestore
+            final userData = userDoc.data();
+            data['userName'] = userData?['name'] ?? 'Anonymous';
+            data['userProfileImage'] = userData?['profileImage'];
           }
         }
 
@@ -73,7 +78,6 @@ class _PostPageState extends State<PostPage> {
             .count()
             .get();
 
-        // Set up real-time listener for comment count
         _setupCommentCountListener(doc.id);
 
         return {
@@ -485,73 +489,28 @@ class _PostPageState extends State<PostPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Post Header with enhanced styling
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                border: Border(
-                                  bottom: BorderSide(
-                                    color: Colors.grey[100]!,
-                                    width: 1,
-                                  ),
+                            ListTile(
+                              leading: CircleAvatar(
+                                backgroundImage: post['userProfileImage'] != null
+                                    ? NetworkImage(post['userProfileImage'])
+                                    : null,
+                                child: post['userProfileImage'] == null
+                                    ? Icon(Icons.person, color: Colors.blue[700])
+                                    : null,
+                              ),
+                              title: Text(
+                                post['userName'] ?? 'Anonymous',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
                                 ),
                               ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.blue.withOpacity(0.1),
-                                          blurRadius: 8,
-                                          offset: const Offset(0, 2),
-                                        ),
-                                      ],
-                                    ),
-                                    child: CircleAvatar(
-                                      radius: 24,
-                                      backgroundColor: Colors.blue[50],
-                                      backgroundImage: post['userProfileImage'] != null
-                                          ? NetworkImage(post['userProfileImage'])
-                                          : null,
-                                      child: post['userProfileImage'] == null
-                                          ? Icon(Icons.person, color: Colors.blue[700], size: 28)
-                                          : null,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          post['userName'] ?? 'Anonymous',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 16,
-                                            letterSpacing: 0.2,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          _formatTimestamp(post['timestamp']),
-                                          style: TextStyle(
-                                            color: Colors.grey[600],
-                                            fontSize: 13,
-                                            letterSpacing: 0.1,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  IconButton(
-                                    icon: Icon(Icons.more_horiz, color: Colors.grey[600]),
-                                    onPressed: () {
-                                      // Show post options
-                                    },
-                                  ),
-                                ],
+                              subtitle: Text(
+                                _formatTimestamp(post['timestamp']),
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 12,
+                                ),
                               ),
                             ),
                             // Post Image with enhanced styling

@@ -1116,12 +1116,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       // Add post to Firestore with username
       await FirebaseFirestore.instance.collection('posts').add({
         'userId': user.uid,
-        'imageUrl': downloadUrl,
+        'userName': userName,
         'caption': _captionController.text,
-        'location': _locationController.text,
+        'imageUrl': downloadUrl,
         'timestamp': FieldValue.serverTimestamp(),
         'likes': 0,
-        'userName': userName, // Use username from Firestore
         'userProfileImage': user.photoURL,
       });
 

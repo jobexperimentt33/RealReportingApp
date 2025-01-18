@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart';
 
 class CommentsSheet extends StatefulWidget {
   final String postId;
@@ -17,61 +18,140 @@ class CommentsSheet extends StatefulWidget {
 }
 
 class _CommentsSheetState extends State<CommentsSheet> {
-  final _commentController = TextEditingController();
+  final TextEditingController _commentController = TextEditingController();
+  bool _isLoading = false;
+  List<Map<String, dynamic>> _comments = [];
 
-  Future<void> _addComment() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null || _commentController.text.trim().isEmpty) return;
+  @override
+  void initState() {
+    super.initState();
+    _loadComments();
+  }
+
+  Future<void> _loadComments() async {
+    setState(() {
+      _isLoading = true;
+    });
 
     try {
-      // Start a batch write
-      final batch = FirebaseFirestore.instance.batch();
-      
-      // Reference to the post document
-      final postRef = FirebaseFirestore.instance.collection('posts').doc(widget.postId);
-      
-      // Add the comment
-      final commentRef = postRef.collection('comments').doc();
-      batch.set(commentRef, {
-        'text': _commentController.text.trim(),
-        'username': user.displayName ?? 'Anonymous',
-        'userId': user.uid,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
+      final snapshot = await FirebaseFirestore.instance
+          .collection('posts')
+          .doc(widget.postId)
+          .collection('comments')
+          .orderBy('timestamp', descending: true)
+          .get();
 
-      // Increment the comment count
-      batch.update(postRef, {
-        'commentCount': FieldValue.increment(1),
-      });
+      final comments = await Future.wait(snapshot.docs.map((doc) async {
+        final data = doc.data();
+        
+        // Fetch user data for each comment
+        if (data['userId'] != null) {
+          final userDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(data['userId'])
+              .get();
+              
+          if (userDoc.exists) {
+            // Get the commenter's name from Firestore
+            final userData = userDoc.data();
+            data['userName'] = userData?['name'] ?? 'Anonymous';
+            data['userProfileImage'] = userData?['profilePicturePath'];
+          }
+        }
 
-      // Commit the batch
-      await batch.commit();
-      _commentController.clear();
+        return {
+          ...data,
+          'id': doc.id,
+        };
+      }));
+
+      setState(() {
+        _comments = comments;
+        _isLoading = false;
+      });
     } catch (e) {
-      print('Error adding comment: $e');
+      print('Error loading comments: $e');
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
-  Future<void> _deleteComment(String commentId) async {
+  Future<void> _addComment() async {
+    if (_commentController.text.trim().isEmpty) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
     try {
-      final batch = FirebaseFirestore.instance.batch();
-      
-      // Reference to the post and comment documents
-      final postRef = FirebaseFirestore.instance.collection('posts').doc(widget.postId);
-      final commentRef = postRef.collection('comments').doc(commentId);
-      
-      // Delete the comment
-      batch.delete(commentRef);
-      
-      // Decrement the comment count
-      batch.update(postRef, {
-        'commentCount': FieldValue.increment(-1),
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) throw Exception('User not logged in');
+
+      // Get user data from Firestore
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      final userName = userDoc.data()?['name'] ?? 'Anonymous';
+
+      // Add comment with user's name
+      await FirebaseFirestore.instance
+          .collection('posts')
+          .doc(widget.postId)
+          .collection('comments')
+          .add({
+        'userId': user.uid,
+        'userName': userName,
+        'text': _commentController.text.trim(),
+        'timestamp': FieldValue.serverTimestamp(),
+        'userProfileImage': userDoc.data()?['profilePicturePath'],
       });
-      
-      await batch.commit();
+
+      _commentController.clear();
+      await _loadComments();
     } catch (e) {
-      print('Error deleting comment: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to add comment: $e')),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
+  }
+
+  // Add this method to format timestamps
+  String _formatTimestamp(Timestamp? timestamp) {
+    if (timestamp == null) return '';
+    
+    final now = DateTime.now();
+    final date = timestamp.toDate();
+    final difference = now.difference(date);
+
+    if (difference.inDays > 7) {
+      // Format as date if older than a week
+      return DateFormat.yMMMd().format(date);
+    } else if (difference.inDays > 0) {
+      // Show days ago if within a week
+      return '${difference.inDays}d ago';
+    } else if (difference.inHours > 0) {
+      // Show hours ago
+      return '${difference.inHours}h ago';
+    } else if (difference.inMinutes > 0) {
+      // Show minutes ago
+      return '${difference.inMinutes}m ago';
+    } else {
+      // Show just now for very recent comments
+      return 'just now';
+    }
+  }
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
   }
 
   @override
@@ -98,75 +178,45 @@ class _CommentsSheetState extends State<CommentsSheet> {
             ),
           ),
           Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('posts')
-                  .doc(widget.postId)
-                  .collection('comments')
-                  .orderBy('timestamp', descending: true)
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return const Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
-                    ),
-                  );
-                }
-
-                final comments = snapshot.data!.docs;
-                return ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  itemCount: comments.length,
-                  itemBuilder: (context, index) {
-                    final comment = comments[index].data() as Map<String, dynamic>;
-                    return Card(
-                      elevation: 0,
-                      color: Colors.blue[100],
-                      margin: const EdgeInsets.symmetric(vertical: 4),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Row(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : ListView.builder(
+                    itemCount: _comments.length,
+                    itemBuilder: (context, index) {
+                      final comment = _comments[index];
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundImage: comment['userProfileImage'] != null
+                              ? NetworkImage(comment['userProfileImage'])
+                              : null,
+                          child: comment['userProfileImage'] == null
+                              ? Icon(Icons.person, color: Colors.blue[700])
+                              : null,
+                        ),
+                        title: Text(
+                          comment['userName'] ?? 'Anonymous',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    comment['username'] ?? 'Anonymous',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.blue[900],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    comment['text'],
-                                    style: TextStyle(color: Colors.blue[800]),
-                                  ),
-                                ],
+                            Text(comment['text']),
+                            const SizedBox(height: 4),
+                            Text(
+                              _formatTimestamp(comment['timestamp']),
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 12,
                               ),
                             ),
-                            // Show delete button only for post owner or comment owner
-                            if (FirebaseAuth.instance.currentUser?.uid == comment['userId'] ||
-                                FirebaseAuth.instance.currentUser?.displayName == widget.postUserName)
-                              IconButton(
-                                icon: Icon(
-                                  Icons.delete_outline,
-                                  color: Colors.blue[900],
-                                  size: 20,
-                                ),
-                                onPressed: () => _deleteComment(comments[index].id),
-                              ),
                           ],
                         ),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
+                      );
+                    },
+                  ),
           ),
           Container(
             decoration: BoxDecoration(
