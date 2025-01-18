@@ -1,11 +1,14 @@
 import 'dart:io';
+import 'dart:ui';
 
+import 'package:brightpath/excise_profile_page.dart';
+import 'package:brightpath/login_page.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:brightpath/prevention_measures_page.dart';
+
 import 'community_page.dart';
 import 'home_page.dart';
 import 'notification_page.dart';
@@ -34,6 +37,9 @@ class _ProfilePageState extends State<ProfilePage> {
   // Add these new variables
   List<String> _posts = [];
   bool _isLoading = false;
+
+  // Add this variable for hover effect
+  int? _hoveredIndex;
 
   @override
   void initState() {
@@ -166,6 +172,175 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  Future<void> _showLogoutDialog() async {
+    return showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (BuildContext context) {
+        return BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 3, sigmaY: 3),
+          child: AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            backgroundColor: Colors.white,
+            elevation: 20,
+            content: Container(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.logout_rounded,
+                      size: 32,
+                      color: Colors.blue[600],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Logout',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Are you sure you want to logout?',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey[600],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 32),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child: Text(
+                            'Cancel',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            await _handleLogout();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue[600],
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            'Logout',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _handleLogout() async {
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      await FirebaseAuth.instance.signOut();
+      
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        // Show success snackbar
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle_outline, color: Colors.green[100]),
+                const SizedBox(width: 12),
+                const Text('Successfully logged out'),
+              ],
+            ),
+            backgroundColor: Colors.green[800],
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+        
+        // Navigate to login page
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginPage()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.error_outline, color: Colors.red[100]),
+                const SizedBox(width: 12),
+                const Text('Failed to logout'),
+              ],
+            ),
+            backgroundColor: Colors.red[800],
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -180,12 +355,54 @@ class _ProfilePageState extends State<ProfilePage> {
             icon: const Icon(Icons.add, color: Colors.blue),
             onPressed: _addNewPost,
           ),
-          IconButton(
-            icon: const Icon(Icons.settings, color: Colors.black),
-            onPressed: () {
-              // Settings functionality
+          PopupMenuButton<String>(
+            offset: const Offset(0, 50),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            icon: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.grey[100],
+              ),
+              child: Icon(
+                Icons.more_vert,
+                color: Colors.blue[600],
+              ),
+            ),
+            itemBuilder: (BuildContext context) => [
+              PopupMenuItem<String>(
+                value: 'settings',
+                child: Row(
+                  children: [
+                    Icon(Icons.settings_outlined, color: Colors.blue[600], size: 20),
+                    const SizedBox(width: 12),
+                    const Text('Settings'),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
+              PopupMenuItem<String>(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(Icons.logout_rounded, color: Colors.blue[600], size: 20),
+                    const SizedBox(width: 12),
+                    const Text('Logout'),
+                  ],
+                ),
+              ),
+            ],
+            onSelected: (value) {
+              if (value == 'logout') {
+                _showLogoutDialog();
+              } else if (value == 'settings') {
+                // Handle settings
+              }
             },
           ),
+          const SizedBox(width: 8),
         ],
       ),
       body: Column(
@@ -332,28 +549,147 @@ class _ProfilePageState extends State<ProfilePage> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.2),
-              spreadRadius: 1,
-              blurRadius: 10,
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 20,
+              offset: const Offset(0, -5),
             ),
           ],
         ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(0, Icons.home_outlined, 'Home'),
-              _buildNavItem(1, Icons.people_outline, 'Community'),
-              _buildNavItem(2, Icons.report_outlined, 'Report'),
-              _buildNavItem(3, Icons.notifications_outlined, 'Notifications'),
-              _buildNavItem(5, Icons.medical_services_outlined,'Prevention'),
-              _buildNavItem(4, Icons.person_outline, 'Profile'),
-            ],
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.blue.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
+              ),
+              child: MouseRegion(
+                onHover: (event) {
+                  final RenderBox box = context.findRenderObject() as RenderBox;
+                  final position = box.globalToLocal(event.position);
+                  final width = box.size.width;
+                  final index = (position.dx / (width / 5)).floor();
+                  setState(() {
+                    _hoveredIndex = index;
+                  });
+                },
+                onExit: (event) {
+                  setState(() {
+                    _hoveredIndex = null;
+                  });
+                },
+                child: BottomNavigationBar(
+                  items: _buildNavItems(),
+                  currentIndex: 4, // Profile tab
+                  selectedItemColor: Colors.blue[600],
+                  unselectedItemColor: Colors.grey[400],
+                  showUnselectedLabels: true,
+                  type: BottomNavigationBarType.fixed,
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  selectedFontSize: 12,
+                  unselectedFontSize: 12,
+                  onTap: (index) {
+                    setState(() {
+                      _selectedIndex = index;
+                    });
+                    
+                    // Handle navigation
+                    switch (index) {
+                      case 0:
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (context) => const HomePage()),
+                        );
+                        break;
+                      case 1:
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (context) => const CommunityPage()),
+                        );
+                        break;
+                      case 2:
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (context) => const ReportPage()),
+                        );
+                        break;
+                      case 3:
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (context) => const ExciseProfilePage()),
+                        );
+                        break;
+                      case 4:
+                        // Already on profile page
+                        break;
+                    }
+                  },
+                ),
+              ),
+            ),
           ),
         ),
       ),
     );
+  }
+
+  List<BottomNavigationBarItem> _buildNavItems() {
+    final items = [
+      NavItem(Icons.home_rounded, Icons.home_outlined, 'Home'),
+      NavItem(Icons.group_rounded, Icons.group_outlined, 'Community'),
+      NavItem(Icons.add_circle_rounded, Icons.add_circle_outlined, 'Report'),
+      NavItem(Icons.notifications_rounded, Icons.notifications_outlined, 'Alerts'),
+      NavItem(Icons.person_rounded, Icons.person_outlined, 'Profile'),
+    ];
+
+    return items.asMap().entries.map((entry) {
+      final index = entry.key;
+      final item = entry.value;
+      final isHovered = _hoveredIndex == index;
+      final isSelected = _selectedIndex == index;
+
+      return BottomNavigationBarItem(
+        icon: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: EdgeInsets.all(isHovered || isSelected ? 8.0 : 6.0),
+          decoration: BoxDecoration(
+            color: isSelected 
+                ? Colors.blue[600] 
+                : isHovered 
+                    ? Colors.blue[50] 
+                    : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: isSelected || isHovered
+                ? [
+                    BoxShadow(
+                      color: Colors.blue.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Icon(
+            isSelected || isHovered ? item.selectedIcon : item.icon,
+            size: isHovered || isSelected ? 28 : 24,
+            color: isSelected 
+                ? Colors.white 
+                : isHovered 
+                    ? Colors.blue[600] 
+                    : Colors.grey[400],
+          ),
+        ),
+        label: item.label,
+      );
+    }).toList();
   }
 
   Future<void> _showEditProfileDialog() async {
@@ -439,73 +775,6 @@ class _ProfilePageState extends State<ProfilePage> {
           style: const TextStyle(color: Colors.grey),
         ),
       ],
-    );
-  }
-
-  Widget _buildNavItem(int index, IconData icon, String label) {
-    bool isSelected = _selectedIndex == index;
-    Color itemColor = isSelected ? Colors.blue : Colors.grey;
-    
-    return InkWell(
-      onTap: () {
-        setState(() {
-          _selectedIndex = index;
-        });
-        
-        // Handle navigation
-        switch (index) {
-          case 0:
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const HomePage()),
-            );
-            break;
-          case 1:
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const CommunityPage()),
-            );
-            break;
-         case 2:
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const ReportPage()),
-            );
-            break;
-          case 3:
-           Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const NotificationPage()),
-            );
-            break;
-          case 4:
-            Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const ProfilePage()));
-            break;
-          case 5:
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const PreventionMeasuresPage()),
-            );      
-  break;
-        }
-      },
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            color: itemColor,
-            size: 24,
-          ),
-          Text(
-            label,
-            style: TextStyle(
-              color: itemColor,
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -636,4 +905,13 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       });
     }
   }
+}
+
+// Add this class at the bottom of the file
+class NavItem {
+  final IconData selectedIcon;
+  final IconData icon;
+  final String label;
+
+  NavItem(this.selectedIcon, this.icon, this.label);
 } 
