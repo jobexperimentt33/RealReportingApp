@@ -8,9 +8,12 @@ import 'event_organization_page.dart';
 import 'institution_listing_page.dart';
 import 'package:brightpath/notification_page.dart';
 import 'package:brightpath/post_page.dart';
+import 'package:intl/intl.dart';
 
 class CommunityPage extends StatefulWidget {
-  const CommunityPage({super.key});
+  final String? communityId;
+  
+  const CommunityPage({super.key, this.communityId});
 
   @override
   State<CommunityPage> createState() => _CommunityPageState();
@@ -340,136 +343,39 @@ class _CommunityPageState extends State<CommunityPage> {
     );
   }
 
-  void _showListFromFirebase(String collection) async {
-    // Convert collection name to match the category field value
-    String categoryValue = collection.toLowerCase();
-    if (categoryValue == 'institution') categoryValue = 'institution';
-    if (categoryValue == 'rehabs') categoryValue = 'Rehab';
-    if (categoryValue == 'collaborations') categoryValue = 'Collaboration';
-    if (categoryValue == 'communities') categoryValue = 'Community';
-    
-    print('Searching for category: $categoryValue'); // Debug log
-    
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return Dialog(
-          child: FutureBuilder<QuerySnapshot>(
-            future: FirebaseFirestore.instance
-                .collection('users')
-                .where('category', isEqualTo: categoryValue)
-                .get(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Padding(
-                  padding: EdgeInsets.all(20.0),
-                  child: Center(child: CircularProgressIndicator()),
-                );
-              }
-
-              if (snapshot.hasError) {
-                print('Error: ${snapshot.error}');
-                return const Padding(
-                  padding: EdgeInsets.all(20.0),
-                  child: Center(child: Text('Something went wrong')),
-                );
-              }
-
-              final items = snapshot.data?.docs ?? [];
-
-              if (items.isEmpty) {
-                String message = 'No ';
-                switch (categoryValue) {
-                  case 'institution':
-                    message += 'institutions';
-                    break;
-                  case 'Collaboration':
-                    message += 'collaborations';
-                    break;
-                  case 'Community':
-                    message += 'communities';
-                    break;
-                  case 'Rehab':
-                    message += 'rehabs';
-                    break;
-                }
-                message += ' available';
-
-                return Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        message,
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                      const SizedBox(height: 16),
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Close'),
-                      ),
-                    ],
-                  ),
-                );
-              }
-
-              return Container(
-                width: double.maxFinite,
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(context).size.height * 0.8,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Text(
-                        collection.toUpperCase(),
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    Flexible(
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: items.length,
-                        itemBuilder: (context, index) {
-                          final data = items[index].data() as Map<String, dynamic>;
-                          return ListTile(
-                            title: Text(data['name'] ?? 'Unnamed'),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (data['district'] != null)
-                                  Text('District: ${data['district']}'),
-                                if (data['email'] != null)
-                                  Text('Email: ${data['email']}'),
-                                if (data['username'] != null)
-                                  Text('Username: ${data['username']}'),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Close'),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
+  void _showListFromFirebase(String type) {
+    if (type == 'collaborations' && widget.communityId != null) {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => Container(
+          height: MediaQuery.of(context).size.height * 0.7,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
-        );
-      },
-    );
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
+                ),
+                child: const Text(
+                  'Collaborators',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              Expanded(child: _buildCollaboratorsList()),
+            ],
+          ),
+        ),
+      );
+    }
   }
 
   List<BottomNavigationBarItem> _buildNavItems() {
@@ -563,6 +469,81 @@ class _CommunityPageState extends State<CommunityPage> {
           MaterialPageRoute(builder: (context) => const ProfilePage()),
         );
         break;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchCollaborators(String communityId) async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('communities')
+        .doc(communityId)
+        .collection('collaborators')
+        .get();
+
+    return snapshot.docs.map((doc) {
+      final data = doc.data();
+      return {
+        'id': doc.id,
+        ...data,
+      };
+    }).toList();
+  }
+
+  Widget _buildCollaboratorsList() {
+    if (widget.communityId == null) {
+      return const Center(child: Text('No community selected'));
+    }
+
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _fetchCollaborators(widget.communityId!),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+
+        final collaborators = snapshot.data ?? [];
+
+        if (collaborators.isEmpty) {
+          return const Center(child: Text('No collaborators yet'));
+        }
+
+        return ListView.builder(
+          itemCount: collaborators.length,
+          itemBuilder: (context, index) {
+            final collaborator = collaborators[index];
+            return ListTile(
+              leading: CircleAvatar(
+                child: Text(collaborator['userName'][0].toUpperCase()),
+              ),
+              title: Text(collaborator['userName']),
+              subtitle: Text('Joined ${_formatTimestamp(collaborator['joinedAt'])}'),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _formatTimestamp(Timestamp? timestamp) {
+    if (timestamp == null) return '';
+    
+    final now = DateTime.now();
+    final date = timestamp.toDate();
+    final difference = now.difference(date);
+
+    if (difference.inDays > 7) {
+      return DateFormat.yMMMd().format(date);
+    } else if (difference.inDays > 0) {
+      return '${difference.inDays}d ago';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes}m ago';
+    } else {
+      return 'just now';
     }
   }
 }

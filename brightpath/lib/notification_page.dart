@@ -18,6 +18,7 @@ class NotificationPage extends StatefulWidget {
 class _NotificationPageState extends State<NotificationPage> {
   int _selectedIndex = 3; // Notifications tab
   int? _hoveredIndex;
+  List<Map<String, dynamic>> _notifications = [];
 
   @override
   Widget build(BuildContext context) {
@@ -58,9 +59,9 @@ class _NotificationPageState extends State<NotificationPage> {
         ),
         child: StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
-              .collection('collaborationRequests')
-              .where('receiverId', isEqualTo: FirebaseAuth.instance.currentUser?.uid)
-              .where('status', isEqualTo: 'pending')
+              .collection('notifications')
+              .where('recipientId', isEqualTo: FirebaseAuth.instance.currentUser?.uid)
+              .where('status', isEqualTo: 'unread')
               .snapshots(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
@@ -177,7 +178,7 @@ class _NotificationPageState extends State<NotificationPage> {
                           children: [
                             Expanded(
                               child: TextButton.icon(
-                                onPressed: () => _handleAccept(request),
+                                onPressed: () => _acceptCollaboration(request),
                                 icon: const Icon(Icons.check_circle_outline),
                                 label: const Text('Accept'),
                                 style: TextButton.styleFrom(
@@ -357,44 +358,99 @@ class _NotificationPageState extends State<NotificationPage> {
     }
   }
 
-  Future<void> _handleAccept(Map<String, dynamic> request) async {
+  Future<void> _acceptCollaboration(Map<String, dynamic> notification) async {
     try {
-      // ... existing accept logic ...
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.check_circle, color: Colors.green[100]),
-              const SizedBox(width: 12),
-              const Text('Request accepted successfully'),
-            ],
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      // Get the notification document ID
+      final notificationId = notification['id'];
+      if (notificationId == null) {
+        throw Exception('Notification ID is missing');
+      }
+
+      // Get user data for the current user
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      
+      final currentUserName = userDoc.data()?['name'] ?? 'Anonymous';
+
+      // Get the community document reference
+      final communityRef = FirebaseFirestore.instance
+          .collection('communities')
+          .doc(notification['communityId']);
+
+      // Add user to collaborators collection
+      await communityRef.collection('collaborators').doc(notification['senderId']).set({
+        'userId': notification['senderId'],
+        'userName': notification['senderName'],
+        'joinedAt': FieldValue.serverTimestamp(),
+        'status': 'active',
+      });
+
+      // Remove the notification
+      await FirebaseFirestore.instance
+          .collection('notifications')
+          .doc(notificationId)
+          .delete();
+
+      // Send acceptance notification to the requester
+      await FirebaseFirestore.instance.collection('notifications').add({
+        'type': 'collaboration_accepted',
+        'senderId': user.uid,
+        'senderName': currentUserName,
+        'recipientId': notification['senderId'],
+        'communityId': notification['communityId'],
+        'communityName': notification['communityName'],
+        'timestamp': FieldValue.serverTimestamp(),
+        'status': 'unread',
+        'message': '$currentUserName accepted your collaboration request for ${notification['communityName']}',
+      });
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.green[100]),
+                const SizedBox(width: 12),
+                const Text('Request accepted successfully'),
+              ],
+            ),
+            backgroundColor: Colors.green[700],
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            margin: const EdgeInsets.all(16),
+            duration: const Duration(seconds: 2),
           ),
-          backgroundColor: Colors.green[700],
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-          margin: const EdgeInsets.all(16),
-        ),
-      );
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.error, color: Colors.red[100]),
-              const SizedBox(width: 12),
-              const Text('Failed to accept request'),
-            ],
+      print('Error accepting collaboration: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.error, color: Colors.red[100]),
+                const SizedBox(width: 12),
+                const Text('Failed to accept request'),
+              ],
+            ),
+            backgroundColor: Colors.red[700],
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            margin: const EdgeInsets.all(16),
           ),
-          backgroundColor: Colors.red[700],
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-          margin: const EdgeInsets.all(16),
-        ),
-      );
+        );
+      }
     }
   }
 
