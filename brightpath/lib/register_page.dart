@@ -21,7 +21,6 @@ class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController _communityNameController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final bool _isVerified = false;
-  int currentIndex = 2;
   String _selectedCategory = 'Excise Department';
   final List<String> _categories = [
     'Excise Department',
@@ -48,48 +47,68 @@ class _RegisterPageState extends State<RegisterPage> {
     'Kannur',
     'Kasaragod',
   ];
-  int? _hoveredIndex;
+  bool _isLoading = false;
+  bool _isPasswordVisible = false;
 
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
+
+    setState(() {
+      _isLoading = true;
+    });
+
     try {
       // Check if username is already in use
       if (await isUsernameTaken(_usernameController.text)) {
-        // Show a dialog or snackbar if the username is taken
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Username Taken'),
-            content: const Text('Please choose a different username.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        );
+        _showErrorDialog('Username Taken', 'Please choose a different username.');
+        setState(() {
+          _isLoading = false;
+        });
         return;
       }
+
+      // Show loading dialog with initial message
+      _showLoadingDialog('Creating your account...');
 
       UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
+      // Update loading message
+      _updateLoadingMessage('Setting up your profile...');
+
       // Send email verification
       await userCredential.user?.sendEmailVerification();
 
       // Set user verification status to false by default
-      await saveUserData(userCredential.user?.uid, false); // Set verified to false
+      await saveUserData(userCredential.user?.uid, false);
 
-      // Navigate to login page with a message
-      Navigator.pop(context, 'Please verify your email before logging in.');
+      // Dismiss loading dialog
+      Navigator.of(context).pop();
+
+      // Show success dialog
+      await _showSuccessDialog();
+
+      // Navigate to login page
+      Navigator.pop(context);
     } catch (e) {
-      // Handle error (e.g., show a dialog)
-      print(e);
+      // Dismiss loading dialog if showing
+      if (_isLoading) {
+        Navigator.of(context).pop();
+      }
+      
+      // Show error dialog with appropriate message
+      _showErrorDialog(
+        'Registration Error',
+        _getReadableErrorMessage(e.toString()),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
@@ -127,22 +146,6 @@ class _RegisterPageState extends State<RegisterPage> {
       'district': _selectedDistrict,
       // Add other user data fields as necessary
     });
-  }
-
-  void _showLoginRequiredDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Login Required'),
-        content: const Text('Please log in to use this feature.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
   }
 
   String _generateUserId() {
@@ -431,6 +434,161 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
+  void _showLoadingDialog(String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return WillPopScope(
+          onWillPop: () async => false,
+          child: AlertDialog(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 20),
+                Text(message),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _updateLoadingMessage(String message) {
+    Navigator.of(context).pop(); // Dismiss current dialog
+    _showLoadingDialog(message); // Show new dialog with updated message
+  }
+
+  Future<void> _showSuccessDialog() {
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.green[600]),
+              const SizedBox(width: 8),
+              const Text('Success'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Your account has been created successfully!'),
+              const SizedBox(height: 12),
+              Text(
+                'A verification email has been sent to ${_emailController.text}',
+                style: TextStyle(color: Colors.grey[600], fontSize: 14),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.error_outline, color: Colors.red[600]),
+            const SizedBox(width: 8),
+            Text(title),
+          ],
+        ),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getReadableErrorMessage(String error) {
+    if (error.contains('email-already-in-use')) {
+      return 'This email is already registered. Please use a different email or try logging in.';
+    } else if (error.contains('weak-password')) {
+      return 'The password provided is too weak. Please choose a stronger password.';
+    } else if (error.contains('invalid-email')) {
+      return 'The email address is invalid. Please check and try again.';
+    }
+    return 'An unexpected error occurred. Please try again later.';
+  }
+
+  String? _validateEmail(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Email is required';
+    }
+    final emailRegex = RegExp(r'^[\w-]+(\.[\w-]+)*@([\w-]+\.)+[a-zA-Z]{2,7}$');
+    if (!emailRegex.hasMatch(value)) {
+      return 'Please enter a valid email address';
+    }
+    return null;
+  }
+
+  String? _validatePassword(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Password is required';
+    }
+    if (value.length < 8) {
+      return 'Password must be at least 8 characters';
+    }
+    if (!value.contains(RegExp(r'[A-Z]'))) {
+      return 'Password must contain at least one uppercase letter';
+    }
+    if (!value.contains(RegExp(r'[a-z]'))) {
+      return 'Password must contain at least one lowercase letter';
+    }
+    if (!value.contains(RegExp(r'[0-9]'))) {
+      return 'Password must contain at least one number';
+    }
+    if (!value.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'))) {
+      return 'Password must contain at least one special character';
+    }
+    return null;
+  }
+
+  String? _validateUsername(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Username is required';
+    }
+    if (value.length < 4) {
+      return 'Username must be at least 4 characters';
+    }
+    if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(value)) {
+      return 'Username can only contain letters, numbers, and underscores';
+    }
+    return null;
+  }
+
+  String? _validateName(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Name is required';
+    }
+    if (value.length < 2) {
+      return 'Name must be at least 2 characters';
+    }
+    if (!RegExp(r'^[a-zA-Z\s]+$').hasMatch(value)) {
+      return 'Name can only contain letters and spaces';
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -643,117 +801,7 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
         ),
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 20,
-              offset: const Offset(0, -5),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.blue.withOpacity(0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
-              ),
-              child: MouseRegion(
-                onHover: (event) {
-                  final RenderBox box = context.findRenderObject() as RenderBox;
-                  final position = box.globalToLocal(event.position);
-                  final width = box.size.width;
-                  final index = (position.dx / (width / 5)).floor();
-                  setState(() {
-                    _hoveredIndex = index;
-                  });
-                },
-                onExit: (event) {
-                  setState(() {
-                    _hoveredIndex = null;
-                  });
-                },
-                child: BottomNavigationBar(
-                  items: _buildNavItems(),
-                  currentIndex: 2,
-                  selectedItemColor: Colors.blue[700],
-                  unselectedItemColor: Colors.grey[400],
-                  showUnselectedLabels: true,
-                  type: BottomNavigationBarType.fixed,
-                  backgroundColor: Colors.transparent,
-                  elevation: 0,
-                  selectedFontSize: 12,
-                  unselectedFontSize: 12,
-                  onTap: (index) => _showLoginRequiredDialog(),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
     );
-  }
-
-  List<BottomNavigationBarItem> _buildNavItems() {
-    final items = [
-      NavItem(Icons.home_rounded, Icons.home_outlined, 'Home'),
-      NavItem(Icons.group_rounded, Icons.group_outlined, 'Community'),
-      NavItem(Icons.add_circle_rounded, Icons.add_circle_outlined, 'Report'),
-      NavItem(Icons.notifications_rounded, Icons.notifications_outlined, 'Alerts'),
-      NavItem(Icons.person_rounded, Icons.person_outlined, 'Profile'),
-    ];
-
-    return items.asMap().entries.map((entry) {
-      final index = entry.key;
-      final item = entry.value;
-      final isHovered = _hoveredIndex == index;
-      final isSelected = 2 == index;
-
-      return BottomNavigationBarItem(
-        icon: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: EdgeInsets.all(isHovered || isSelected ? 8.0 : 6.0),
-          decoration: BoxDecoration(
-            color: isSelected 
-                ? Colors.blue[700] 
-                : isHovered 
-                    ? Colors.blue[50] 
-                    : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: isSelected || isHovered
-                ? [
-                    BoxShadow(
-                      color: Colors.blue.withOpacity(0.1),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Icon(
-            isSelected || isHovered ? item.selectedIcon : item.icon,
-            size: isHovered || isSelected ? 28 : 24,
-            color: isSelected 
-                ? Colors.white 
-                : isHovered 
-                    ? Colors.blue[700] 
-                    : Colors.grey[400],
-          ),
-        ),
-        label: item.label,
-      );
-    }).toList();
   }
 }
 
