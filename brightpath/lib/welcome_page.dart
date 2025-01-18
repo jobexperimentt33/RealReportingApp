@@ -34,10 +34,11 @@ class WelcomePage extends StatelessWidget {
                         color: Colors.white.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(24),
                       ),
-                      child: const Icon(
-                        Icons.psychology,
-                        size: 72,
-                        color: Colors.white,
+                      child: Image.asset(
+                        'assets/logo.png',
+                        width: 72,
+                        height: 72,
+                        fit: BoxFit.contain,
                       ),
                     ),
                   ),
