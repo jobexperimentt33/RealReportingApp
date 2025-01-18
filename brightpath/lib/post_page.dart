@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:brightpath/community_page.dart';
 import 'package:brightpath/login_page.dart';
+import 'package:brightpath/profile_page.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -9,6 +11,9 @@ import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'comments_sheet.dart';
+import 'package:brightpath/prevention_measures_page.dart';
+import 'package:brightpath/notification_page.dart';
+import 'package:brightpath/report_page.dart';
 
 class PostPage extends StatefulWidget {
   final int initialPostIndex;
@@ -24,6 +29,7 @@ class _PostPageState extends State<PostPage> {
   bool _isLoading = true;
   final Map<String, StreamSubscription> _commentCountListeners = {};
   int? _hoveredIndex;
+  int _selectedIndex = 1; // Community tab
 
   @override
   void dispose() {
@@ -325,6 +331,51 @@ class _PostPageState extends State<PostPage> {
           ),
         );
       }
+    }
+  }
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+    
+    switch (index) {
+      case 0:
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const ReportPage()),
+        );
+        break;
+      case 1:
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const CommunityPage()),
+        );
+        break;
+      case 2:
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const ReportPage()),
+        );
+        break;
+      case 3:
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const NotificationPage()),
+        );
+        break;
+      case 4:
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const PreventionMeasuresPage()),
+        );
+        break;
+      case 5:
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const ProfilePage()),
+        );
+        break;
     }
   }
 
@@ -757,59 +808,35 @@ class _PostPageState extends State<PostPage> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 20,
-              offset: const Offset(0, -5),
+              color: Colors.grey.withOpacity(0.2),
+              spreadRadius: 1,
+              blurRadius: 10,
             ),
           ],
         ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.blue.withOpacity(0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
-              ),
-              child: MouseRegion(
-                onHover: (event) {
-                  final RenderBox box = context.findRenderObject() as RenderBox;
-                  final position = box.globalToLocal(event.position);
-                  final width = box.size.width;
-                  final index = (position.dx / (width / 5)).floor();
-                  setState(() {
-                    _hoveredIndex = index;
-                  });
-                },
-                onExit: (event) {
-                  setState(() {
-                    _hoveredIndex = null;
-                  });
-                },
-                child: BottomNavigationBar(
-                  items: _buildNavItems(),
-                  currentIndex: 1, // Community tab
-                  selectedItemColor: Colors.blue[600],
-                  unselectedItemColor: Colors.grey[400],
-                  showUnselectedLabels: true,
-                  type: BottomNavigationBarType.fixed,
-                  backgroundColor: Colors.transparent,
-                  elevation: 0,
-                  selectedFontSize: 12,
-                  unselectedFontSize: 12,
-                  onTap: (index) {
-                    // Handle navigation
-                  },
-                ),
-              ),
-            ),
+        child: MouseRegion(
+          onEnter: (event) {
+            setState(() {
+              _hoveredIndex = null;
+            });
+          },
+          onExit: (event) {
+            setState(() {
+              _hoveredIndex = null;
+            });
+          },
+          child: BottomNavigationBar(
+            items: _buildNavItems(),
+            currentIndex: _selectedIndex,
+            selectedItemColor: Colors.blue[700],
+            unselectedItemColor: Colors.grey[400],
+            showUnselectedLabels: true,
+            type: BottomNavigationBarType.fixed,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            selectedFontSize: 12,
+            unselectedFontSize: 12,
+            onTap: _onItemTapped,
           ),
         ),
       ),
@@ -880,6 +907,7 @@ class _PostPageState extends State<PostPage> {
       NavItem(Icons.group_rounded, Icons.group_outlined, 'Community'),
       NavItem(Icons.add_circle_rounded, Icons.add_circle_outlined, 'Report'),
       NavItem(Icons.notifications_rounded, Icons.notifications_outlined, 'Alerts'),
+      NavItem(Icons.medical_services_rounded, Icons.medical_services_outlined, 'Prevention'),
       NavItem(Icons.person_rounded, Icons.person_outlined, 'Profile'),
     ];
 
@@ -887,7 +915,7 @@ class _PostPageState extends State<PostPage> {
       final index = entry.key;
       final item = entry.value;
       final isHovered = _hoveredIndex == index;
-      final isSelected = 1 == index; // Community tab
+      final isSelected = _selectedIndex == index;
 
       return BottomNavigationBarItem(
         icon: AnimatedContainer(
@@ -895,7 +923,7 @@ class _PostPageState extends State<PostPage> {
           padding: EdgeInsets.all(isHovered || isSelected ? 8.0 : 6.0),
           decoration: BoxDecoration(
             color: isSelected 
-                ? Colors.blue[600] 
+                ? Colors.blue[700] 
                 : isHovered 
                     ? Colors.blue[50] 
                     : Colors.transparent,
@@ -916,7 +944,7 @@ class _PostPageState extends State<PostPage> {
             color: isSelected 
                 ? Colors.white 
                 : isHovered 
-                    ? Colors.blue[600] 
+                    ? Colors.blue[700] 
                     : Colors.grey[400],
           ),
         ),
