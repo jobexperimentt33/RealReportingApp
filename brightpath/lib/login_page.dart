@@ -66,19 +66,32 @@ class _LoginPageState extends State<LoginPage> {
                 .doc(user.uid)
                 .set({'verified': true}, SetOptions(merge: true));
                 
-            // Show success message
+            // Show success message and wait for it to be displayed
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Login successful!'),
+                content: Row(
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.white),
+                    SizedBox(width: 12),
+                    Text('Login successful!'),
+                  ],
+                ),
+                backgroundColor: Colors.green,
                 duration: Duration(seconds: 2),
+                behavior: SnackBarBehavior.floating,
               ),
             );
 
-            // Navigate to profile page only on successful login
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const PostPage(initialPostIndex: 0,)),
-            );
+            // Wait for 2 seconds to show the success message
+            await Future.delayed(const Duration(seconds: 2));
+
+            // Navigate to post page only after showing success message
+            if (mounted) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const PostPage(initialPostIndex: 0)),
+              );
+            }
           } else if (user != null) {
             // Send verification email if not verified
             await userCredential.user!.sendEmailVerification();
@@ -100,7 +113,6 @@ class _LoginPageState extends State<LoginPage> {
                 );
               },
             );
-            // Do not navigate to profile page if email is not verified
           }
         }
       } catch (e) {
@@ -110,7 +122,7 @@ class _LoginPageState extends State<LoginPage> {
           builder: (BuildContext context) {
             return AlertDialog(
               title: const Text('Login Error'),
-              content: Text(e.toString()),
+              content: Text(_getReadableErrorMessage(e.toString())),
               actions: [
                 TextButton(
                   onPressed: () {
@@ -122,7 +134,6 @@ class _LoginPageState extends State<LoginPage> {
             );
           },
         );
-        // Do not navigate to profile page on error
       }
     }
   }
@@ -240,6 +251,22 @@ class _LoginPageState extends State<LoginPage> {
         );
       }
     }
+  }
+
+  // Add this helper method to get readable error messages
+  String _getReadableErrorMessage(String error) {
+    if (error.contains('user-not-found')) {
+      return 'No user found with this email address.';
+    } else if (error.contains('wrong-password')) {
+      return 'Incorrect password. Please try again.';
+    } else if (error.contains('invalid-email')) {
+      return 'Invalid email address format.';
+    } else if (error.contains('user-disabled')) {
+      return 'This account has been disabled.';
+    } else if (error.contains('too-many-requests')) {
+      return 'Too many failed login attempts. Please try again later.';
+    }
+    return 'An error occurred during login. Please try again.';
   }
 
   @override
