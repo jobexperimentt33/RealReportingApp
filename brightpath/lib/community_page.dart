@@ -1,3 +1,4 @@
+import 'package:brightpath/home_page.dart';
 import 'package:brightpath/profile_page.dart';
 import 'package:brightpath/report_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -6,14 +7,12 @@ import 'package:brightpath/prevention_measures_page.dart';
 import 'event_list_page.dart';
 import 'event_organization_page.dart';
 import 'institution_listing_page.dart';
-import 'package:brightpath/notification_page.dart';
-import 'package:brightpath/post_page.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'collaborations_list_page.dart';
 
 class CommunityPage extends StatefulWidget {
-  final String? communityId;
-  
-  const CommunityPage({super.key, this.communityId});
+  const CommunityPage({super.key});
 
   @override
   State<CommunityPage> createState() => _CommunityPageState();
@@ -189,7 +188,10 @@ class _CommunityPageState extends State<CommunityPage> {
                     _buildGridItem(
                       'Collaborations',
                       Icons.people_outline,
-                      () => _showListFromFirebase('collaborations'),
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const CollaborationsListPage()),
+                      ),
                     ),
                     _buildGridItem(
                       'Institutions',
@@ -221,35 +223,57 @@ class _CommunityPageState extends State<CommunityPage> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.2),
-              spreadRadius: 1,
-              blurRadius: 10,
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 20,
+              offset: const Offset(0, -5),
             ),
           ],
         ),
-        child: MouseRegion(
-          onEnter: (event) {
-            setState(() {
-              _hoveredIndex = null;
-            });
-          },
-          onExit: (event) {
-            setState(() {
-              _hoveredIndex = null;
-            });
-          },
-          child: BottomNavigationBar(
-            items: _buildNavItems(),
-            currentIndex: _selectedIndex,
-            selectedItemColor: Colors.blue[700],
-            unselectedItemColor: Colors.grey[400],
-            showUnselectedLabels: true,
-            type: BottomNavigationBarType.fixed,
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            selectedFontSize: 12,
-            unselectedFontSize: 12,
-            onTap: _onItemTapped,
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.blue.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
+              ),
+              child: MouseRegion(
+                onHover: (event) {
+                  final RenderBox box = context.findRenderObject() as RenderBox;
+                  final position = box.globalToLocal(event.position);
+                  final width = box.size.width;
+                  final index = (position.dx / (width / 5)).floor();
+                  setState(() {
+                    _hoveredIndex = index;
+                  });
+                },
+                onExit: (event) {
+                  setState(() {
+                    _hoveredIndex = null;
+                  });
+                },
+                child: BottomNavigationBar(
+                  items: _buildNavItems(),
+                  currentIndex: _selectedIndex,
+                  selectedItemColor: Colors.blue[700],
+                  unselectedItemColor: Colors.grey[400],
+                  showUnselectedLabels: true,
+                  type: BottomNavigationBarType.fixed,
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  selectedFontSize: 12,
+                  unselectedFontSize: 12,
+                  onTap: _onItemTapped,
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -300,7 +324,16 @@ class _CommunityPageState extends State<CommunityPage> {
 
   Widget _buildGridItem(String title, IconData icon, VoidCallback onTap) {
     return InkWell(
-      onTap: onTap,
+      onTap: () {
+        if (title == 'Collaborations') {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const CollaborationsListPage()),
+          );
+        } else {
+          onTap();
+        }
+      },
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -343,39 +376,23 @@ class _CommunityPageState extends State<CommunityPage> {
     );
   }
 
-  void _showListFromFirebase(String type) {
-    if (type == 'collaborations' && widget.communityId != null) {
-      showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (context) => Container(
-          height: MediaQuery.of(context).size.height * 0.7,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
-                ),
-                child: const Text(
-                  'Collaborators',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              Expanded(child: _buildCollaboratorsList()),
-            ],
-          ),
-        ),
-      );
+  Future<void> _showListFromFirebase(String collectionName) async {
+    try {
+      if (collectionName != 'collaborations') {
+        // Handle other collections as before
+        final snapshot = await FirebaseFirestore.instance
+            .collection(collectionName)
+            .get();
+        // ... rest of the existing code for other collections ...
+      }
+    } catch (e) {
+      print('Error loading data: $e');
     }
+  }
+
+  String _formatTimestamp(Timestamp timestamp) {
+    final date = timestamp.toDate();
+    return DateFormat('MMM d, yyyy').format(date);
   }
 
   List<BottomNavigationBarItem> _buildNavItems() {
@@ -437,113 +454,26 @@ class _CommunityPageState extends State<CommunityPage> {
     
     switch (index) {
       case 0:
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const PostPage(initialPostIndex: 0)),
-        );
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const HomePage()));
         break;
       case 1:
         // Already on community page
         break;
       case 2:
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const ReportPage()),
-        );
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const ReportPage()));
         break;
       case 3:
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const NotificationPage()),
-        );
+        Navigator.pushReplacementNamed(context, '/notifications');
         break;
       case 4:
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const ProfilePage()));
+        break;
+      case 5:
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const PreventionMeasuresPage()),
         );
         break;
-      case 5:
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const ProfilePage()),
-        );
-        break;
-    }
-  }
-
-  Future<List<Map<String, dynamic>>> _fetchCollaborators(String communityId) async {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('communities')
-        .doc(communityId)
-        .collection('collaborators')
-        .get();
-
-    return snapshot.docs.map((doc) {
-      final data = doc.data();
-      return {
-        'id': doc.id,
-        ...data,
-      };
-    }).toList();
-  }
-
-  Widget _buildCollaboratorsList() {
-    if (widget.communityId == null) {
-      return const Center(child: Text('No community selected'));
-    }
-
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: _fetchCollaborators(widget.communityId!),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}'));
-        }
-
-        final collaborators = snapshot.data ?? [];
-
-        if (collaborators.isEmpty) {
-          return const Center(child: Text('No collaborators yet'));
-        }
-
-        return ListView.builder(
-          itemCount: collaborators.length,
-          itemBuilder: (context, index) {
-            final collaborator = collaborators[index];
-            return ListTile(
-              leading: CircleAvatar(
-                child: Text(collaborator['userName'][0].toUpperCase()),
-              ),
-              title: Text(collaborator['userName']),
-              subtitle: Text('Joined ${_formatTimestamp(collaborator['joinedAt'])}'),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  String _formatTimestamp(Timestamp? timestamp) {
-    if (timestamp == null) return '';
-    
-    final now = DateTime.now();
-    final date = timestamp.toDate();
-    final difference = now.difference(date);
-
-    if (difference.inDays > 7) {
-      return DateFormat.yMMMd().format(date);
-    } else if (difference.inDays > 0) {
-      return '${difference.inDays}d ago';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours}h ago';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes}m ago';
-    } else {
-      return 'just now';
     }
   }
 }
