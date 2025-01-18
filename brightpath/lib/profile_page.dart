@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
+import 'package:brightpath/prevention_measures_page.dart';
 import 'community_page.dart';
 import 'home_page.dart';
 import 'notification_page.dart';
@@ -32,7 +32,7 @@ class _ProfilePageState extends State<ProfilePage> {
   // Add image picker
   final ImagePicker _picker = ImagePicker();
 
-  int _selectedIndex = 4; // Since we're on Profile page, index 4
+  int _selectedIndex = 5; // Since Profile is now the last item (index 5)
 
   // Add these new variables
   List<String> _posts = [];
@@ -109,9 +109,10 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  Future<void> _addNewPost() async {
+  Future<void> _addNewPost(ImageSource source) async {
     try {
-      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+      Navigator.pop(context); // Close bottom sheet
+      final XFile? image = await _picker.pickImage(source: source);
       if (image == null) return;
 
       // Navigate to post creation screen
@@ -160,12 +161,15 @@ class _ProfilePageState extends State<ProfilePage> {
 
       if (userDoc.exists) {
         final userData = userDoc.data();
-        if (userData != null && userData['profilePicturePath'] != null) {
-          await _auth.currentUser?.updatePhotoURL(userData['profilePicturePath']);
-          setState(() {
+        setState(() {
+          _name = userData?['name'] ?? 'Anonymous';
+          _bio = userData?['bio'];
+          _phoneNumber = userData?['phone'];
+          if (userData?['profilePicturePath'] != null) {
+            _auth.currentUser?.updatePhotoURL(userData?['profilePicturePath']);
             _user = _auth.currentUser;
-          });
-        }
+          }
+        });
       }
     } catch (e) {
       print('Error loading user data: $e');
@@ -341,208 +345,317 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  Future<void> _showAddPostOptions() async {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Text(
+              'Create Post',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.blue[700],
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildPostOptionButton(
+                  icon: Icons.camera_alt,
+                  label: 'Camera',
+                  onTap: () => _addNewPost(ImageSource.camera),
+                ),
+                _buildPostOptionButton(
+                  icon: Icons.photo_library,
+                  label: 'Gallery',
+                  onTap: () => _addNewPost(ImageSource.gallery),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPostOptionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.blue[50],
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: Colors.blue[700], size: 32),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.blue[700],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
+        elevation: 0,
         backgroundColor: Colors.white,
         title: const Text(
           'Profile',
-          style: TextStyle(color: Colors.black),
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add, color: Colors.blue),
-            onPressed: _addNewPost,
+            icon: Icon(Icons.settings_outlined, color: Colors.blue[700]),
+            onPressed: () {
+              // Handle settings
+            },
           ),
-          PopupMenuButton<String>(
-            offset: const Offset(0, 50),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            icon: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.grey[100],
-              ),
-              child: Icon(
-                Icons.more_vert,
-                color: Colors.blue[600],
-              ),
-            ),
-            itemBuilder: (BuildContext context) => [
-              PopupMenuItem<String>(
-                value: 'settings',
-                child: Row(
+          IconButton(
+            icon: Icon(Icons.logout_rounded, color: Colors.blue[700]),
+            onPressed: _showLogoutDialog,
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await _loadUserData();
+          await _loadPosts();
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
+              // Profile Header Section
+              Container(
+                color: Colors.white,
+                padding: const EdgeInsets.all(24),
+                child: Column(
                   children: [
-                    Icon(Icons.settings_outlined, color: Colors.blue[600], size: 20),
-                    const SizedBox(width: 12),
-                    const Text('Settings'),
+                    // Profile Picture with Edit Button
+                    Stack(
+                      children: [
+                        Container(
+                          width: 120,
+                          height: 120,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white,
+                              width: 4,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.blue.withOpacity(0.2),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: GestureDetector(
+                            onTap: _uploadProfilePicture,
+                            child: CircleAvatar(
+                              radius: 58,
+                              backgroundColor: Colors.blue[100],
+                              backgroundImage: _user?.photoURL != null
+                                  ? NetworkImage(_user!.photoURL!)
+                                  : null,
+                              child: _user?.photoURL == null
+                                  ? Icon(Icons.person, size: 50, color: Colors.blue[700])
+                                  : null,
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.blue[700],
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                            ),
+                            child: const Icon(
+                              Icons.edit,
+                              size: 20,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // User Name
+                    Text(
+                      _name ?? 'Anonymous',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    if (_bio != null && _bio!.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        _bio!,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 24),
+                    // Stats Row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _buildStatColumn('Posts', _posts.length.toString()),
+                        Container(
+                          height: 40,
+                          width: 1,
+                          color: Colors.grey[300],
+                        ),
+                        _buildStatColumn('Collaborators', '0'),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    // Action Buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () => _showEditProfileDialog(),
+                            icon: const Icon(Icons.edit),
+                            label: const Text('Edit Profile'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue[700],
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              // Handle share profile
+                            },
+                            icon: const Icon(Icons.share),
+                            label: const Text('Share Profile'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.blue[700],
+                              side: BorderSide(color: Colors.blue[700]!),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
-              const PopupMenuDivider(),
-              PopupMenuItem<String>(
-                value: 'logout',
-                child: Row(
+              const SizedBox(height: 8),
+              // Posts Grid Section
+              Container(
+                color: Colors.white,
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.logout_rounded, color: Colors.blue[600], size: 20),
-                    const SizedBox(width: 12),
-                    const Text('Logout'),
+                    Text(
+                      'Posts',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue[700],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _posts.isEmpty
+                        ? Center(
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.photo_library_outlined,
+                                  size: 64,
+                                  color: Colors.grey[400],
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No posts yet',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 3,
+                              crossAxisSpacing: 2,
+                              mainAxisSpacing: 2,
+                            ),
+                            itemCount: _posts.length,
+                            itemBuilder: (context, index) => _buildPostThumbnail(index),
+                          ),
                   ],
                 ),
               ),
             ],
-            onSelected: (value) {
-              if (value == 'logout') {
-                _showLogoutDialog();
-              } else if (value == 'settings') {
-                // Handle settings
-              }
-            },
           ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Profile Picture Section
-                GestureDetector(
-                  onTap: _uploadProfilePicture,
-                  child: Stack(
-                    children: [
-                      CircleAvatar(
-                        radius: 45,
-                        backgroundColor: Colors.blue.shade100,
-                        backgroundImage: _user?.photoURL != null
-                            ? NetworkImage(_user!.photoURL!)
-                            : null,
-                        child: _user?.photoURL == null
-                            ? const Icon(Icons.person, size: 45, color: Colors.blue)
-                            : null,
-                      ),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: Colors.blue,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: const Icon(
-                            Icons.camera_alt,
-                            size: 20,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 20),
-                // Stats Section
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _buildStatColumn('Posts', _posts.length.toString()),
-                          _buildStatColumn('Collaborators', '0'),
-                        ],
-                      ),
-                      const SizedBox(height: 15),
-                      // Bio Section
-                      Text(
-                        _bio ?? 'Add a bio...',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: _bio == null ? Colors.grey : Colors.black,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Buttons Section
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    onPressed: () {
-                      _showEditProfileDialog();
-                    },
-                    child: const Text('Edit Profile'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.blue,
-                      side: const BorderSide(color: Colors.blue),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    onPressed: () {},
-                    child: const Text('Share Profile'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          // Grid view for posts
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : GridView.builder(
-                    padding: const EdgeInsets.all(2),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
-                      crossAxisSpacing: 2,
-                      mainAxisSpacing: 2,
-                    ),
-                    itemCount: _posts.length,
-                    itemBuilder: (context, index) {
-                      return GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => PostPage(initialPostIndex: index),
-                            ),
-                          );
-                        },
-                        child: Image.network(
-                          _posts[index],
-                          fit: BoxFit.cover,
-                        ),
-                      );
-                    },
-                  ),
-          ),
-        ],
+        ),
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
@@ -587,8 +700,8 @@ class _ProfilePageState extends State<ProfilePage> {
                 },
                 child: BottomNavigationBar(
                   items: _buildNavItems(),
-                  currentIndex: 4, // Profile tab
-                  selectedItemColor: Colors.blue[600],
+                  currentIndex: 5, // Set to Profile tab index
+                  selectedItemColor: Colors.blue[700],
                   unselectedItemColor: Colors.grey[400],
                   showUnselectedLabels: true,
                   type: BottomNavigationBarType.fixed,
@@ -624,12 +737,17 @@ class _ProfilePageState extends State<ProfilePage> {
                       case 3:
                         Navigator.pushReplacement(
                           context,
-                          MaterialPageRoute(builder: (context) => const ExciseProfilePage()),
+                          MaterialPageRoute(builder: (context) => const NotificationPage()),
                         );
                         break;
                       case 4:
-                        // Already on profile page
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (context) => const PreventionMeasuresPage()),
+                        );
                         break;
+                      case 5:
+                        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const ProfilePage()));
                     }
                   },
                 ),
@@ -637,6 +755,11 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
           ),
         ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAddPostOptions,
+        backgroundColor: Colors.blue[700],
+        child: const Icon(Icons.add_photo_alternate_rounded, color: Colors.white),
       ),
     );
   }
@@ -647,6 +770,7 @@ class _ProfilePageState extends State<ProfilePage> {
       NavItem(Icons.group_rounded, Icons.group_outlined, 'Community'),
       NavItem(Icons.add_circle_rounded, Icons.add_circle_outlined, 'Report'),
       NavItem(Icons.notifications_rounded, Icons.notifications_outlined, 'Alerts'),
+      NavItem(Icons.medical_services_rounded, Icons.medical_services_outlined, 'Prevention'),
       NavItem(Icons.person_rounded, Icons.person_outlined, 'Profile'),
     ];
 
@@ -654,7 +778,7 @@ class _ProfilePageState extends State<ProfilePage> {
       final index = entry.key;
       final item = entry.value;
       final isHovered = _hoveredIndex == index;
-      final isSelected = _selectedIndex == index;
+      final isSelected = index == 5; // Force Profile tab to be selected
 
       return BottomNavigationBarItem(
         icon: AnimatedContainer(
@@ -662,7 +786,7 @@ class _ProfilePageState extends State<ProfilePage> {
           padding: EdgeInsets.all(isHovered || isSelected ? 8.0 : 6.0),
           decoration: BoxDecoration(
             color: isSelected 
-                ? Colors.blue[600] 
+                ? Colors.blue[700] 
                 : isHovered 
                     ? Colors.blue[50] 
                     : Colors.transparent,
@@ -683,7 +807,7 @@ class _ProfilePageState extends State<ProfilePage> {
             color: isSelected 
                 ? Colors.white 
                 : isHovered 
-                    ? Colors.blue[600] 
+                    ? Colors.blue[700] 
                     : Colors.grey[400],
           ),
         ),
@@ -743,13 +867,72 @@ class _ProfilePageState extends State<ProfilePage> {
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
-              setState(() {
-                _bio = newBio;
-                _name = newName;
-                _phoneNumber = newPhone;
-                // TODO: Update user profile in Firebase
-              });
+            onPressed: () async {
+              try {
+                // Show loading indicator
+                setState(() => _isLoading = true);
+                
+                // Update Firestore document
+                await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(_auth.currentUser!.uid)
+                    .set({
+                  'name': newName,
+                  'bio': newBio,
+                  'phone': newPhone,
+                  'lastUpdated': FieldValue.serverTimestamp(),
+                }, SetOptions(merge: true));
+
+                // Update local state
+                setState(() {
+                  _bio = newBio;
+                  _name = newName;
+                  _phoneNumber = newPhone;
+                  _isLoading = false;
+                });
+
+                if (mounted) {
+                  // Show success message
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Row(
+                        children: [
+                          Icon(Icons.check_circle, color: Colors.green[100]),
+                          const SizedBox(width: 12),
+                          const Text('Profile updated successfully'),
+                        ],
+                      ),
+                      backgroundColor: Colors.green[600],
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      margin: const EdgeInsets.all(16),
+                    ),
+                  );
+                }
+              } catch (e) {
+                setState(() => _isLoading = false);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Row(
+                        children: [
+                          Icon(Icons.error, color: Colors.red[100]),
+                          const SizedBox(width: 12),
+                          const Text('Failed to update profile'),
+                        ],
+                      ),
+                      backgroundColor: Colors.red[600],
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      margin: const EdgeInsets.all(16),
+                    ),
+                  );
+                }
+              }
               Navigator.pop(context);
             },
             child: const Text('Save'),
@@ -775,6 +958,28 @@ class _ProfilePageState extends State<ProfilePage> {
           style: const TextStyle(color: Colors.grey),
         ),
       ],
+    );
+  }
+
+  Widget _buildPostThumbnail(int index) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PostPage(initialPostIndex: index),
+          ),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          image: DecorationImage(
+            image: NetworkImage(_posts[index]),
+            fit: BoxFit.cover,
+          ),
+        ),
+      ),
     );
   }
 }
