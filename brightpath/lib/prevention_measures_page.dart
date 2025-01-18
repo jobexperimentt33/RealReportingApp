@@ -4,6 +4,8 @@ import 'package:brightpath/home_page.dart';
 import 'package:brightpath/community_page.dart';
 import 'package:brightpath/profile_page.dart';
 import 'package:brightpath/report_page.dart';
+import 'package:brightpath/notification_page.dart';
+import 'package:brightpath/post_page.dart';
 
 class PreventionMeasuresPage extends StatefulWidget {
   const PreventionMeasuresPage({super.key});
@@ -13,7 +15,8 @@ class PreventionMeasuresPage extends StatefulWidget {
 }
 
 class _PreventionMeasuresPageState extends State<PreventionMeasuresPage> {
-  int _selectedIndex = 4; // Correct index for Prevention tab
+  int _selectedIndex = 4; // Prevention tab
+  int? _hoveredIndex;
   String? selectedDrug;
   bool isLoading = false;
   String? preventionMeasures;
@@ -197,8 +200,138 @@ class _PreventionMeasuresPageState extends State<PreventionMeasuresPage> {
           ),
         ),
       ),
-      bottomNavigationBar: _buildBottomNavBar(),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.2),
+              spreadRadius: 1,
+              blurRadius: 10,
+            ),
+          ],
+        ),
+        child: MouseRegion(
+          onEnter: (event) {
+            setState(() {
+              _hoveredIndex = null;
+            });
+          },
+          onExit: (event) {
+            setState(() {
+              _hoveredIndex = null;
+            });
+          },
+          child: BottomNavigationBar(
+            items: _buildNavItems(),
+            currentIndex: _selectedIndex,
+            selectedItemColor: Colors.blue[700],
+            unselectedItemColor: Colors.grey[400],
+            showUnselectedLabels: true,
+            type: BottomNavigationBarType.fixed,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            selectedFontSize: 12,
+            unselectedFontSize: 12,
+            onTap: _onItemTapped,
+          ),
+        ),
+      ),
     );
+  }
+
+  List<BottomNavigationBarItem> _buildNavItems() {
+    final items = [
+      NavItem(Icons.home_rounded, Icons.home_outlined, 'Home'),
+      NavItem(Icons.group_rounded, Icons.group_outlined, 'Community'),
+      NavItem(Icons.add_circle_rounded, Icons.add_circle_outlined, 'Report'),
+      NavItem(Icons.notifications_rounded, Icons.notifications_outlined, 'Alerts'),
+      NavItem(Icons.medical_services_rounded, Icons.medical_services_outlined, 'Prevention'),
+      NavItem(Icons.person_rounded, Icons.person_outlined, 'Profile'),
+    ];
+
+    return items.asMap().entries.map((entry) {
+      final index = entry.key;
+      final item = entry.value;
+      final isHovered = _hoveredIndex == index;
+      final isSelected = _selectedIndex == index;
+
+      return BottomNavigationBarItem(
+        icon: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: EdgeInsets.all(isHovered || isSelected ? 8.0 : 6.0),
+          decoration: BoxDecoration(
+            color: isSelected 
+                ? Colors.blue[700] 
+                : isHovered 
+                    ? Colors.blue[50] 
+                    : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: isSelected || isHovered
+                ? [
+                    BoxShadow(
+                      color: Colors.blue.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Icon(
+            isSelected || isHovered ? item.selectedIcon : item.icon,
+            size: isHovered || isSelected ? 28 : 24,
+            color: isSelected 
+                ? Colors.white 
+                : isHovered 
+                    ? Colors.blue[700] 
+                    : Colors.grey[400],
+          ),
+        ),
+        label: item.label,
+      );
+    }).toList();
+  }
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+    
+    switch (index) {
+      case 0:
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const PostPage(initialPostIndex: 0)),
+        );
+        break;
+      case 1:
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const CommunityPage()),
+        );
+        break;
+      case 2:
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const ReportPage()),
+        );
+        break;
+      case 3:
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const NotificationPage()),
+        );
+        break;
+      case 4:
+        // Already on prevention page
+        break;
+      case 5:
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const ProfilePage()),
+        );
+        break;
+    }
   }
 
   Widget _buildDropdown() {
@@ -417,49 +550,12 @@ class _PreventionMeasuresPageState extends State<PreventionMeasuresPage> {
       ],
     );
   }
-
-  Widget _buildBottomNavBar() {
-    final navItems = [
-      _NavItem(Icons.home_rounded, Icons.home_outlined, 'Home', const HomePage()),
-      _NavItem(Icons.group_rounded, Icons.group_outlined, 'Community', const CommunityPage()),
-      _NavItem(Icons.add_circle_rounded, Icons.add_circle_outlined, 'Report', const ReportPage()),
-      _NavItem(Icons.notifications_rounded, Icons.notifications_outlined, 'Alerts', null),
-      _NavItem(Icons.medical_services_rounded, Icons.medical_services_outlined, 'Prevention', this.widget),
-      _NavItem(Icons.person_rounded, Icons.person_outlined, 'Profile', const ProfilePage()),
-    ];
-
-    return BottomNavigationBar(
-      items: navItems.map((item) {
-        return BottomNavigationBarItem(
-          icon: Icon(item.icon),
-          activeIcon: Icon(item.activeIcon),
-          label: item.label,
-        );
-      }).toList(),
-      currentIndex: _selectedIndex,
-      selectedItemColor: Colors.blue[700],
-      unselectedItemColor: Colors.grey[400],
-      showUnselectedLabels: true,
-      type: BottomNavigationBarType.fixed,
-      backgroundColor: Colors.white,
-      elevation: 8,
-      onTap: (index) {
-        setState(() {
-          _selectedIndex = index;
-        });
-        if (navItems[index].destination != null) {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => navItems[index].destination!));
-        }
-      },
-    );
-  }
 }
 
-class _NavItem {
-  final IconData activeIcon;
+class NavItem {
+  final IconData selectedIcon;
   final IconData icon;
   final String label;
-  final Widget? destination;
 
-  _NavItem(this.activeIcon, this.icon, this.label, this.destination);
+  NavItem(this.selectedIcon, this.icon, this.label);
 }

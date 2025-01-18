@@ -1,5 +1,4 @@
 import 'package:brightpath/community_page.dart';
-import 'package:brightpath/home_page.dart';
 import 'package:brightpath/profile_page.dart';
 import 'package:flutter/material.dart';
 import 'package:brightpath/prevention_measures_page.dart';
@@ -7,6 +6,8 @@ import 'exice_contact_page.dart';
 import 'location_report_page.dart';
 import 'report_form_page.dart';
 import 'hotspot_region_page.dart';
+import 'package:brightpath/notification_page.dart';
+import 'package:brightpath/post_page.dart';
 
 class ReportPage extends StatefulWidget {
   const ReportPage({super.key});
@@ -150,57 +151,35 @@ class _ReportPageState extends State<ReportPage> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 20,
-              offset: const Offset(0, -5),
+              color: Colors.grey.withOpacity(0.2),
+              spreadRadius: 1,
+              blurRadius: 10,
             ),
           ],
         ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.blue.withOpacity(0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
-              ),
-              child: MouseRegion(
-                onHover: (event) {
-                  final RenderBox box = context.findRenderObject() as RenderBox;
-                  final position = box.globalToLocal(event.position);
-                  final width = box.size.width;
-                  final index = (position.dx / (width / 5)).floor();
-                  setState(() {
-                    _hoveredIndex = index;
-                  });
-                },
-                onExit: (event) {
-                  setState(() {
-                    _hoveredIndex = null;
-                  });
-                },
-                child: BottomNavigationBar(
-                  items: _buildNavItems(),
-                  currentIndex: _selectedIndex,
-                  selectedItemColor: Colors.blue[700],
-                  unselectedItemColor: Colors.grey[400],
-                  showUnselectedLabels: true,
-                  type: BottomNavigationBarType.fixed,
-                  backgroundColor: Colors.transparent,
-                  elevation: 0,
-                  selectedFontSize: 12,
-                  unselectedFontSize: 12,
-                  onTap: _onItemTapped,
-                ),
-              ),
-            ),
+        child: MouseRegion(
+          onEnter: (event) {
+            setState(() {
+              _hoveredIndex = null;
+            });
+          },
+          onExit: (event) {
+            setState(() {
+              _hoveredIndex = null;
+            });
+          },
+          child: BottomNavigationBar(
+            items: _buildNavItems(),
+            currentIndex: _selectedIndex,
+            selectedItemColor: Colors.blue[700],
+            unselectedItemColor: Colors.grey[400],
+            showUnselectedLabels: true,
+            type: BottomNavigationBarType.fixed,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            selectedFontSize: 12,
+            unselectedFontSize: 12,
+            onTap: _onItemTapped,
           ),
         ),
       ),
@@ -271,8 +250,8 @@ class _ReportPageState extends State<ReportPage> {
       NavItem(Icons.group_rounded, Icons.group_outlined, 'Community'),
       NavItem(Icons.add_circle_rounded, Icons.add_circle_outlined, 'Report'),
       NavItem(Icons.notifications_rounded, Icons.notifications_outlined, 'Alerts'),
-      NavItem(Icons.person_rounded, Icons.person_outlined, 'Profile'),
       NavItem(Icons.medical_services_rounded, Icons.medical_services_outlined, 'Prevention'),
+      NavItem(Icons.person_rounded, Icons.person_outlined, 'Profile'),
     ];
 
     return items.asMap().entries.map((entry) {
@@ -324,24 +303,36 @@ class _ReportPageState extends State<ReportPage> {
     
     switch (index) {
       case 0:
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const HomePage()));
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const PostPage(initialPostIndex: 0)),
+        );
         break;
       case 1:
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const CommunityPage()));
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const CommunityPage()),
+        );
         break;
       case 2:
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const ReportPage()));
+        // Already on report page
         break;
       case 3:
-        Navigator.pushReplacementNamed(context, '/notifications');
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const NotificationPage()),
+        );
         break;
       case 4:
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const ProfilePage()));
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const PreventionMeasuresPage()),
+        );
         break;
       case 5:
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const PreventionMeasuresPage()),
+          MaterialPageRoute(builder: (context) => const ProfilePage()),
         );
         break;
     }

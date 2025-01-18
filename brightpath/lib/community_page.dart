@@ -1,4 +1,3 @@
-import 'package:brightpath/home_page.dart';
 import 'package:brightpath/profile_page.dart';
 import 'package:brightpath/report_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -7,6 +6,8 @@ import 'package:brightpath/prevention_measures_page.dart';
 import 'event_list_page.dart';
 import 'event_organization_page.dart';
 import 'institution_listing_page.dart';
+import 'package:brightpath/notification_page.dart';
+import 'package:brightpath/post_page.dart';
 
 class CommunityPage extends StatefulWidget {
   const CommunityPage({super.key});
@@ -217,57 +218,35 @@ class _CommunityPageState extends State<CommunityPage> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 20,
-              offset: const Offset(0, -5),
+              color: Colors.grey.withOpacity(0.2),
+              spreadRadius: 1,
+              blurRadius: 10,
             ),
           ],
         ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.blue.withOpacity(0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
-              ),
-              child: MouseRegion(
-                onHover: (event) {
-                  final RenderBox box = context.findRenderObject() as RenderBox;
-                  final position = box.globalToLocal(event.position);
-                  final width = box.size.width;
-                  final index = (position.dx / (width / 5)).floor();
-                  setState(() {
-                    _hoveredIndex = index;
-                  });
-                },
-                onExit: (event) {
-                  setState(() {
-                    _hoveredIndex = null;
-                  });
-                },
-                child: BottomNavigationBar(
-                  items: _buildNavItems(),
-                  currentIndex: _selectedIndex,
-                  selectedItemColor: Colors.blue[700],
-                  unselectedItemColor: Colors.grey[400],
-                  showUnselectedLabels: true,
-                  type: BottomNavigationBarType.fixed,
-                  backgroundColor: Colors.transparent,
-                  elevation: 0,
-                  selectedFontSize: 12,
-                  unselectedFontSize: 12,
-                  onTap: _onItemTapped,
-                ),
-              ),
-            ),
+        child: MouseRegion(
+          onEnter: (event) {
+            setState(() {
+              _hoveredIndex = null;
+            });
+          },
+          onExit: (event) {
+            setState(() {
+              _hoveredIndex = null;
+            });
+          },
+          child: BottomNavigationBar(
+            items: _buildNavItems(),
+            currentIndex: _selectedIndex,
+            selectedItemColor: Colors.blue[700],
+            unselectedItemColor: Colors.grey[400],
+            showUnselectedLabels: true,
+            type: BottomNavigationBarType.fixed,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            selectedFontSize: 12,
+            unselectedFontSize: 12,
+            onTap: _onItemTapped,
           ),
         ),
       ),
@@ -552,24 +531,36 @@ class _CommunityPageState extends State<CommunityPage> {
     
     switch (index) {
       case 0:
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const HomePage()));
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const PostPage(initialPostIndex: 0)),
+        );
         break;
       case 1:
         // Already on community page
         break;
       case 2:
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const ReportPage()));
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const ReportPage()),
+        );
         break;
       case 3:
-        Navigator.pushReplacementNamed(context, '/notifications');
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const NotificationPage()),
+        );
         break;
       case 4:
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const ProfilePage()));
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const PreventionMeasuresPage()),
+        );
         break;
       case 5:
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const PreventionMeasuresPage()),
+          MaterialPageRoute(builder: (context) => const ProfilePage()),
         );
         break;
     }

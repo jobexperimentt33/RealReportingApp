@@ -341,10 +341,7 @@ class _PostPageState extends State<PostPage> {
     
     switch (index) {
       case 0:
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const PostPage(initialPostIndex: 0,)),
-        );
+        // Already on post/home page
         break;
       case 1:
         Navigator.pushReplacement(
@@ -382,34 +379,40 @@ class _PostPageState extends State<PostPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.blue[50],
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        backgroundColor: Colors.blue[600],
-        elevation: 2,
+        backgroundColor: Colors.white,
+        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Icon(Icons.arrow_back_ios, color: Colors.blue[700]),
           onPressed: () => Navigator.pop(context),
         ),
         title: Row(
           children: [
             Image.asset(
-              'assets/logo.png',
+              'assets/brightpath_logo.png',
               height: 32,
               errorBuilder: (context, error, stackTrace) => const SizedBox(width: 32),
             ),
             const SizedBox(width: 12),
-            const Text(
-              'Community Posts',
+            Text(
+              'BrightPath',
               style: TextStyle(
-                fontSize: 22,
+                fontSize: 24,
                 fontWeight: FontWeight.w600,
-                color: Colors.white,
+                color: Colors.blue[700],
                 letterSpacing: 0.5,
               ),
             ),
           ],
         ),
         actions: [
+          IconButton(
+            icon: Icon(Icons.search, color: Colors.blue[700]),
+            onPressed: () {
+              // Handle search
+            },
+          ),
           PopupMenuButton<String>(
             offset: const Offset(0, 50),
             shape: RoundedRectangleBorder(
@@ -419,34 +422,16 @@ class _PostPageState extends State<PostPage> {
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.1),
+                color: Colors.blue[50],
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.more_vert,
-                color: Colors.white,
+                color: Colors.blue[700],
               ),
             ),
             itemBuilder: (BuildContext context) => [
-              PopupMenuItem<String>(
-                value: 'settings',
-                child: Row(
-                  children: [
-                    Icon(Icons.settings_outlined, color: Colors.blue[600], size: 20),
-                    const SizedBox(width: 12),
-                    const Text('Settings'),
-                  ],
-                ),
-              ),
-              PopupMenuItem<String>(
-                value: 'logout',
-                child: Row(
-                  children: [
-                    Icon(Icons.logout_rounded, color: Colors.blue[600], size: 20),
-                    const SizedBox(width: 12),
-                    const Text('Logout'),
-                  ],
-                ),
-              ),
+              _buildPopupMenuItem('settings', Icons.settings_outlined, 'Settings'),
+              _buildPopupMenuItem('logout', Icons.logout_rounded, 'Logout'),
             ],
             onSelected: (value) {
               if (value == 'logout') {
@@ -473,334 +458,114 @@ class _PostPageState extends State<PostPage> {
         ),
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
-            : ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                itemCount: _posts.length,
-                itemBuilder: (context, index) {
-                  final post = _posts[index];
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 16.0),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.blue[100]!.withOpacity(0.3),
-                          spreadRadius: 2,
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // User info header with gradient
-                        Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                Colors.blue[600]!.withOpacity(0.1),
-                                Colors.blue[100]!.withOpacity(0.1),
-                              ],
-                            ),
-                            borderRadius: const BorderRadius.only(
-                              topLeft: Radius.circular(16),
-                              topRight: Radius.circular(16),
-                            ),
-                          ),
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            leading: CircleAvatar(
-                              radius: 20,
-                              backgroundColor: Colors.blue[100],
-                              backgroundImage: post['userProfileImage'] != null
-                                  ? NetworkImage(post['userProfileImage'])
-                                  : null,
-                              child: post['userProfileImage'] == null
-                                  ? Icon(Icons.person, size: 24, color: Colors.blue[600])
-                                  : null,
-                            ),
-                            title: Text(
-                              post['userName'] ?? 'Anonymous',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+            : RefreshIndicator(
+                onRefresh: _loadPosts,
+                child: ListView.builder(
+                  itemCount: _posts.length,
+                  itemBuilder: (context, index) {
+                    final post = _posts[index];
+                    return Card(
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 2,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Post Header
+                          Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Row(
                               children: [
-                                if (post['location'] != null)
-                                  Text(
-                                    post['location'],
-                                    style: TextStyle(fontSize: 12),
-                                  ),
-                                Text(
-                                  DateFormat.yMMMd().format(
-                                    (post['timestamp'] as Timestamp).toDate(),
-                                  ),
-                                  style: TextStyle(fontSize: 12),
+                                CircleAvatar(
+                                  radius: 24,
+                                  backgroundColor: Colors.blue[100],
+                                  backgroundImage: post['userProfileImage'] != null
+                                      ? NetworkImage(post['userProfileImage'])
+                                      : null,
+                                  child: post['userProfileImage'] == null
+                                      ? Icon(Icons.person, color: Colors.blue[700])
+                                      : null,
                                 ),
-                                if (post['caption'] != null && 
-                                    post['caption'].toString().isNotEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 4.0),
-                                    child: Text(
-                                      post['caption'],
-                                      style: TextStyle(fontSize: 13),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            trailing: Container(
-                              padding: EdgeInsets.only(right: 10),
-                              child: PopupMenuButton<String>(
-                                icon: Icon(Icons.more_vert, 
-                                  color: Colors.blue[900],
-                                  size: 20,
-                                ),
-                                onSelected: (value) async {
-                                  if (value == 'edit') {
-                                    // Show edit caption dialog
-                                    final newCaption = await showDialog<String>(
-                                      context: context,
-                                      builder: (context) => AlertDialog(
-                                        title: const Text('Edit Caption'),
-                                        content: TextField(
-                                          controller: TextEditingController(text: post['caption']),
-                                          decoration: const InputDecoration(
-                                            hintText: 'Enter new caption',
-                                          ),
-                                          maxLines: 3,
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () => Navigator.pop(context),
-                                            child: const Text('Cancel'),
-                                          ),
-                                          TextButton(
-                                            onPressed: () => Navigator.pop(
-                                              context,
-                                              (context.findAncestorWidgetOfExactType<TextField>())
-                                                  ?.controller?.text,
-                                            ),
-                                            child: const Text('Save'),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-
-                                    if (newCaption != null) {
-                                      try {
-                                        await FirebaseFirestore.instance
-                                            .collection('posts')
-                                            .doc(post['id'])
-                                            .update({'caption': newCaption});
-                                        
-                                        setState(() {
-                                          post['caption'] = newCaption;
-                                        });
-                                      } catch (e) {
-                                        print('Error updating caption: $e');
-                                      }
-                                    }
-                                  } else if (value == 'delete') {
-                                    // Show delete confirmation dialog
-                                    final confirm = await showDialog<bool>(
-                                      context: context,
-                                      builder: (context) => AlertDialog(
-                                        title: const Text('Delete Post'),
-                                        content: const Text('Are you sure you want to delete this post?'),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () => Navigator.pop(context, false),
-                                            child: const Text('Cancel'),
-                                          ),
-                                          TextButton(
-                                            onPressed: () => Navigator.pop(context, true),
-                                            child: const Text('Delete',
-                                              style: TextStyle(color: Colors.red),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-
-                                    if (confirm == true) {
-                                      try {
-                                        await FirebaseFirestore.instance
-                                            .collection('posts')
-                                            .doc(post['id'])
-                                            .delete();
-                                        
-                                        setState(() {
-                                          _posts.removeAt(index);
-                                        });
-                                      } catch (e) {
-                                        print('Error deleting post: $e');
-                                      }
-                                    }
-                                  } else if (value == 'save') {
-                                    // Implement save functionality here
-                                    // You can add the post to a user's saved posts collection
-                                    try {
-                                      final user = FirebaseAuth.instance.currentUser;
-                                      if (user != null) {
-                                        await FirebaseFirestore.instance
-                                            .collection('users')
-                                            .doc(user.uid)
-                                            .collection('saved_posts')
-                                            .doc(post['id'])
-                                            .set({
-                                              'savedAt': FieldValue.serverTimestamp(),
-                                              'postId': post['id'],
-                                            });
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('Post saved successfully')),
-                                        );
-                                      }
-                                    } catch (e) {
-                                      print('Error saving post: $e');
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Failed to save post')),
-                                      );
-                                    }
-                                  }
-                                },
-                                itemBuilder: (context) {
-                                  final currentUser = FirebaseAuth.instance.currentUser;
-                                  final isAuthor = currentUser?.uid == post['userId'];
-                                  
-                                  return [
-                                    if (isAuthor) ...[
-                                      const PopupMenuItem(
-                                        value: 'edit',
-                                        child: Row(
-                                          children: [
-                                            Icon(Icons.edit),
-                                            SizedBox(width: 8),
-                                            Text('Edit Caption'),
-                                          ],
-                                        ),
-                                      ),
-                                      const PopupMenuItem(
-                                        value: 'delete',
-                                        child: Row(
-                                          children: [
-                                            Icon(Icons.delete, color: Colors.red),
-                                            SizedBox(width: 8),
-                                            Text('Delete Post', style: TextStyle(color: Colors.red)),
-                                          ],
-                                        ),
-                                      ),
-                                    ] else
-                                      const PopupMenuItem(
-                                        value: 'save',
-                                        child: Row(
-                                          children: [
-                                            Icon(Icons.bookmark_border),
-                                            SizedBox(width: 8),
-                                            Text('Save Post'),
-                                          ],
-                                        ),
-                                      ),
-                                  ];
-                                },
-                              ),
-                            ),
-                          ),
-                        ),
-                        // Image with rounded corners
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.network(
-                            post['imageUrl'],
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                            height: MediaQuery.of(context).size.width - 32,
-                          ),
-                        ),
-                        // Action buttons with enhanced styling
-                        Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                Colors.blue[600]!.withOpacity(0.1),
-                                Colors.blue[100]!.withOpacity(0.1),
-                              ],
-                            ),
-                            borderRadius: const BorderRadius.only(
-                              bottomLeft: Radius.circular(16),
-                              bottomRight: Radius.circular(16),
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  _buildActionButton(
-                                    icon: post['liked'] ? Icons.favorite : Icons.favorite_border,
-                                    color: post['liked'] ? Colors.red : Colors.blue[600]!,
-                                    onPressed: () => _toggleLike(post['id'], index),
-                                  ),
-                                  _buildCommentButton(post),
-                                  _buildActionButton(
-                                    icon: Icons.share_outlined,
-                                    color: Colors.blue[600]!,
-                                    onPressed: () => _sharePost(post),
-                                  ),
-                                ],
-                              ),
-                              // Enhanced likes and caption section
-                              Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Column(
+                                const SizedBox(width: 12),
+                                Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      '${post['likes'] ?? 0} likes',
-                                      style: TextStyle(
+                                      post['userName'] ?? 'Anonymous',
+                                      style: const TextStyle(
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.blue[600],
                                         fontSize: 16,
                                       ),
                                     ),
-                                    if (post['caption'] != null && 
-                                        post['caption'].toString().isNotEmpty)
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 8.0),
-                                        child: RichText(
-                                          text: TextSpan(
-                                            style: TextStyle(
-                                              color: Colors.blue[900],
-                                              fontSize: 15,
-                                            ),
-                                            children: [
-                                              TextSpan(
-                                                text: '${post['userName']} ',
-                                                style: const TextStyle(fontWeight: FontWeight.bold),
-                                              ),
-                                              TextSpan(text: post['caption']),
-                                            ],
-                                          ),
-                                        ),
+                                    Text(
+                                      _formatTimestamp(post['timestamp']),
+                                      style: TextStyle(
+                                        color: Colors.grey[600],
+                                        fontSize: 12,
                                       ),
+                                    ),
                                   ],
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
+                          // Post Image
+                          if (post['imageUrl'] != null)
+                            Container(
+                              constraints: const BoxConstraints(
+                                maxHeight: 400,
+                              ),
+                              width: double.infinity,
+                              child: Image.network(
+                                post['imageUrl'],
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          // Post Actions
+                          Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Row(
+                              children: [
+                                _buildActionButton(
+                                  icon: Icons.favorite_outline,
+                                  color: Colors.red[400]!,
+                                  onPressed: () {
+                                    // Handle like
+                                  },
+                                ),
+                                _buildCommentButton(post),
+                                _buildActionButton(
+                                  icon: Icons.share_outlined,
+                                  color: Colors.green[600]!,
+                                  onPressed: () => _sharePost(post),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Post Caption
+                          if (post['caption'] != null)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                              child: Text.rich(
+                                TextSpan(
+                                  children: [
+                                    TextSpan(
+                                      text: '${post['userName']} ',
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                    TextSpan(text: post['caption']),
+                                  ],
+                                ),
+                                style: const TextStyle(fontSize: 15),
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
               ),
       ),
       bottomNavigationBar: Container(
@@ -963,6 +728,24 @@ class _PostPageState extends State<PostPage> {
       '${caption.isNotEmpty ? '$caption\n\n' : ''}'
       '$imageUrl',
     );
+  }
+
+  PopupMenuItem<String> _buildPopupMenuItem(String value, IconData icon, String text) {
+    return PopupMenuItem<String>(
+      value: value,
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.blue[700], size: 20),
+          const SizedBox(width: 12),
+          Text(text),
+        ],
+      ),
+    );
+  }
+
+  String _formatTimestamp(Timestamp timestamp) {
+    final date = timestamp.toDate();
+    return DateFormat.yMMMd().format(date);
   }
 }
 
