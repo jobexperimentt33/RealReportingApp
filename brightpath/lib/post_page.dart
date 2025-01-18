@@ -470,98 +470,190 @@ class _PostPageState extends State<PostPage> {
                         borderRadius: BorderRadius.circular(16),
                       ),
                       elevation: 2,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Post Header
-                          Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Row(
-                              children: [
-                                CircleAvatar(
-                                  radius: 24,
-                                  backgroundColor: Colors.blue[100],
-                                  backgroundImage: post['userProfileImage'] != null
-                                      ? NetworkImage(post['userProfileImage'])
-                                      : null,
-                                  child: post['userProfileImage'] == null
-                                      ? Icon(Icons.person, color: Colors.blue[700])
-                                      : null,
-                                ),
-                                const SizedBox(width: 12),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      post['userName'] ?? 'Anonymous',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                    Text(
-                                      _formatTimestamp(post['timestamp']),
-                                      style: TextStyle(
-                                        color: Colors.grey[600],
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          color: Colors.white,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.blue.withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
                             ),
-                          ),
-                          // Post Image
-                          if (post['imageUrl'] != null)
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Post Header with enhanced styling
                             Container(
-                              constraints: const BoxConstraints(
-                                maxHeight: 400,
-                              ),
-                              width: double.infinity,
-                              child: Image.network(
-                                post['imageUrl'],
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                          // Post Actions
-                          Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Row(
-                              children: [
-                                _buildActionButton(
-                                  icon: Icons.favorite_outline,
-                                  color: Colors.red[400]!,
-                                  onPressed: () {
-                                    // Handle like
-                                  },
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                border: Border(
+                                  bottom: BorderSide(
+                                    color: Colors.grey[100]!,
+                                    width: 1,
+                                  ),
                                 ),
-                                _buildCommentButton(post),
-                                _buildActionButton(
-                                  icon: Icons.share_outlined,
-                                  color: Colors.green[600]!,
-                                  onPressed: () => _sharePost(post),
-                                ),
-                              ],
-                            ),
-                          ),
-                          // Post Caption
-                          if (post['caption'] != null)
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                              child: Text.rich(
-                                TextSpan(
-                                  children: [
-                                    TextSpan(
-                                      text: '${post['userName']} ',
-                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.blue.withOpacity(0.1),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
                                     ),
-                                    TextSpan(text: post['caption']),
-                                  ],
-                                ),
-                                style: const TextStyle(fontSize: 15),
+                                    child: CircleAvatar(
+                                      radius: 24,
+                                      backgroundColor: Colors.blue[50],
+                                      backgroundImage: post['userProfileImage'] != null
+                                          ? NetworkImage(post['userProfileImage'])
+                                          : null,
+                                      child: post['userProfileImage'] == null
+                                          ? Icon(Icons.person, color: Colors.blue[700], size: 28)
+                                          : null,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          post['userName'] ?? 'Anonymous',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 16,
+                                            letterSpacing: 0.2,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          _formatTimestamp(post['timestamp']),
+                                          style: TextStyle(
+                                            color: Colors.grey[600],
+                                            fontSize: 13,
+                                            letterSpacing: 0.1,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: Icon(Icons.more_horiz, color: Colors.grey[600]),
+                                    onPressed: () {
+                                      // Show post options
+                                    },
+                                  ),
+                                ],
                               ),
                             ),
-                        ],
+                            // Post Image with enhanced styling
+                            if (post['imageUrl'] != null)
+                              Container(
+                                constraints: const BoxConstraints(
+                                  maxHeight: 400,
+                                ),
+                                width: double.infinity,
+                                child: ClipRRect(
+                                  child: Image.network(
+                                    post['imageUrl'],
+                                    fit: BoxFit.cover,
+                                    loadingBuilder: (context, child, loadingProgress) {
+                                      if (loadingProgress == null) return child;
+                                      return Container(
+                                        height: 400,
+                                        color: Colors.grey[100],
+                                        child: Center(
+                                          child: CircularProgressIndicator(
+                                            value: loadingProgress.expectedTotalBytes != null
+                                                ? loadingProgress.cumulativeBytesLoaded /
+                                                    loadingProgress.expectedTotalBytes!
+                                                : null,
+                                            valueColor: AlwaysStoppedAnimation<Color>(Colors.blue[700]!),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
+                            // Post Actions with enhanced styling
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              decoration: BoxDecoration(
+                                border: Border(
+                                  top: BorderSide(
+                                    color: Colors.grey[100]!,
+                                    width: 1,
+                                  ),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  _buildEnhancedActionButton(
+                                    icon: Icons.favorite_outline,
+                                    label: 'Like',
+                                    color: Colors.red[400]!,
+                                    onPressed: () {
+                                      // Handle like
+                                    },
+                                  ),
+                                  const SizedBox(width: 20),
+                                  _buildEnhancedActionButton(
+                                    icon: Icons.comment_outlined,
+                                    label: 'Comment',
+                                    count: post['commentCount'],
+                                    color: Colors.blue[600]!,
+                                    onPressed: () => _showComments(
+                                      post['id'],
+                                      post['userName'] ?? post['userId'] ?? 'Anonymous',
+                                    ),
+                                  ),
+                                  const SizedBox(width: 20),
+                                  _buildEnhancedActionButton(
+                                    icon: Icons.share_outlined,
+                                    label: 'Share',
+                                    color: Colors.green[600]!,
+                                    onPressed: () => _sharePost(post),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Post Caption with enhanced styling
+                            if (post['caption'] != null)
+                              Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Text.rich(
+                                  TextSpan(
+                                    children: [
+                                      TextSpan(
+                                        text: '${post['userName']} ',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          letterSpacing: 0.2,
+                                        ),
+                                      ),
+                                      TextSpan(
+                                        text: post['caption'],
+                                        style: const TextStyle(
+                                          height: 1.4,
+                                          letterSpacing: 0.1,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  style: const TextStyle(fontSize: 15),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                     );
                   },
@@ -608,61 +700,36 @@ class _PostPageState extends State<PostPage> {
     );
   }
 
-  Widget _buildActionButton({
+  Widget _buildEnhancedActionButton({
     required IconData icon,
+    required String label,
     required Color color,
     required VoidCallback onPressed,
+    int? count,
   }) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(8),
         onTap: onPressed,
         child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Icon(icon, color: color, size: 28),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Row(
+            children: [
+              Icon(icon, color: color, size: 22),
+              const SizedBox(width: 4),
+              Text(
+                count != null ? '$count' : label,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-    );
-  }
-
-  Widget _buildCommentButton(Map<String, dynamic> post) {
-    return Stack(
-      children: [
-        _buildActionButton(
-          icon: Icons.comment_outlined,
-          color: Colors.blue[600]!,
-          onPressed: () => _showComments(
-            post['id'],
-            post['userName'] ?? post['userId'] ?? 'Anonymous',
-          ),
-        ),
-        if ((post['commentCount'] ?? 0) > 0)
-          Positioned(
-            top: 8,
-            right: 8,
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: Colors.red,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              constraints: const BoxConstraints(
-                minWidth: 18,
-                minHeight: 18,
-              ),
-              child: Text(
-                '${post['commentCount']}',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ),
-      ],
     );
   }
 
