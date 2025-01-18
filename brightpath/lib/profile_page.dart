@@ -437,7 +437,7 @@ class _ProfilePageState extends State<ProfilePage> {
           case 0:
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (context) => const HomePage()),
+              MaterialPageRoute(builder: (context) => const PostPage(initialPostIndex: 0,)),
             );
             break;
           case 1:

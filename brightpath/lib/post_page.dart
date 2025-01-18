@@ -29,7 +29,7 @@ class _PostPageState extends State<PostPage> {
   bool _isLoading = true;
   final Map<String, StreamSubscription> _commentCountListeners = {};
   int? _hoveredIndex;
-  int _selectedIndex = 1; // Community tab
+  int _selectedIndex = 0; // Community tab
 
   @override
   void dispose() {
@@ -343,7 +343,7 @@ class _PostPageState extends State<PostPage> {
       case 0:
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const ReportPage()),
+          MaterialPageRoute(builder: (context) => const PostPage(initialPostIndex: 0,)),
         );
         break;
       case 1:

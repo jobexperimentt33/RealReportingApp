@@ -77,7 +77,7 @@ class _LoginPageState extends State<LoginPage> {
             // Navigate to profile page only on successful login
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (context) => const ProfilePage()),
+              MaterialPageRoute(builder: (context) => const PostPage(initialPostIndex: 0,)),
             );
           } else if (user != null) {
             // Send verification email if not verified
