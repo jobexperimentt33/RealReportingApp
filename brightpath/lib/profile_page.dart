@@ -804,7 +804,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         case 0:
                           Navigator.pushReplacement(
                             context,
-                            MaterialPageRoute(builder: (context) => const HomePage()),
+                            MaterialPageRoute(builder: (context) => const PostPage(initialPostIndex: 0,)),
                           );
                           break;
                         case 1:
@@ -1085,6 +1085,62 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   final TextEditingController _locationController = TextEditingController();
   bool _isLoading = false;
 
+  Future<void> _createPost(BuildContext context) async {
+    if (_isLoading) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) throw Exception('User not logged in');
+
+      // Get username from Firestore
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      final userName = userDoc.data()?['name'] ?? 'Anonymous';
+
+      // Upload image to Firebase Storage
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('posts')
+          .child('${DateTime.now().millisecondsSinceEpoch}.jpg');
+
+      await storageRef.putFile(File(widget.imageFile.path));
+      final downloadUrl = await storageRef.getDownloadURL();
+
+      // Add post to Firestore with username
+      await FirebaseFirestore.instance.collection('posts').add({
+        'userId': user.uid,
+        'imageUrl': downloadUrl,
+        'caption': _captionController.text,
+        'location': _locationController.text,
+        'timestamp': FieldValue.serverTimestamp(),
+        'likes': 0,
+        'userName': userName, // Use username from Firestore
+        'userProfileImage': user.photoURL,
+      });
+
+      if (mounted) {
+        Navigator.pop(context, true); // Return true to indicate success
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to create post: $e')),
+        );
+      }
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1146,55 +1202,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         ),
       ),
     );
-  }
-
-  Future<void> _createPost(BuildContext context) async {
-    if (_isLoading) return;
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) throw Exception('User not logged in');
-
-      // Upload image to Firebase Storage
-      final storageRef = FirebaseStorage.instance
-          .ref()
-          .child('posts')
-          .child(user.uid)
-          .child('${DateTime.now().millisecondsSinceEpoch}.jpg');
-
-      await storageRef.putFile(File(widget.imageFile.path));
-      final downloadUrl = await storageRef.getDownloadURL();
-
-      // Add post to Firestore
-      await FirebaseFirestore.instance.collection('posts').add({
-        'userId': user.uid,
-        'imageUrl': downloadUrl,
-        'caption': _captionController.text,
-        'location': _locationController.text,
-        'timestamp': FieldValue.serverTimestamp(),
-        'likes': 0,
-        'userName': user.displayName ?? 'Anonymous',
-        'userProfileImage': user.photoURL,
-      });
-
-      if (mounted) {
-        Navigator.pop(context, true); // Return true to indicate success
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to create post: $e')),
-        );
-      }
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
   }
 }
 
