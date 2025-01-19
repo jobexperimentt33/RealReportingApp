@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
-import 'package:rxdart/rxdart.dart';
+import 'package:rxdart/rxdart.dart' as rx;
 
 class ViewReportsPage extends StatefulWidget {
   const ViewReportsPage({super.key});
@@ -107,31 +107,29 @@ class _ViewReportsPageState extends State<ViewReportsPage> {
   }
 
   Stream<List<QuerySnapshot>> _getReportsStream() {
-    List<Stream<QuerySnapshot>> streams = [];
+    List<Future<QuerySnapshot>> futures = [];
 
     if (_selectedReportType == 'all' || _selectedReportType == 'location') {
-      streams.add(
+      futures.add(
         FirebaseFirestore.instance
             .collection('location_reports')
+            .where('status', isEqualTo: _selectedFilter)
             .orderBy('timestamp', descending: true)
-            .snapshots()
+            .get()
       );
     }
 
     if (_selectedReportType == 'all' || _selectedReportType == 'known_person') {
-      streams.add(
+      futures.add(
         FirebaseFirestore.instance
             .collection('known_person_report')
+            .where('status', isEqualTo: _selectedFilter)
             .orderBy('incidentDate', descending: true)
-            .snapshots()
+            .get()
       );
     }
 
-    if (streams.isEmpty) {
-      return Stream.value([]);
-    }
-
-    return Rx.combineLatestList(streams);
+    return Stream.fromFuture(Future.wait(futures));
   }
 
   Widget _buildReportCard(Map<String, dynamic> report) {

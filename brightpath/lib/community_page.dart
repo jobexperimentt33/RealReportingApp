@@ -12,6 +12,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'notification_page.dart';
 import 'collaborations_list_page.dart';
+import 'package:brightpath/rehab_centers_page.dart';
 
 class CommunityPage extends StatefulWidget {
   const CommunityPage({super.key});
@@ -214,7 +215,10 @@ class _CommunityPageState extends State<CommunityPage> {
                     _buildGridItem(
                       'Rehabs',
                       Icons.local_hospital_outlined,
-                      () => _showListFromFirebase('rehabs'),
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const RehabCentersPage()),
+                      ),
                     ),
                   ],
                 ),

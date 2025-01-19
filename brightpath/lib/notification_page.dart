@@ -1,12 +1,14 @@
-import 'package:brightpath/prevention_measures_page.dart';
-import 'package:brightpath/report_page.dart';
-import 'package:brightpath/profile_page.dart';
 import 'package:brightpath/community_page.dart';
-import 'package:brightpath/post_page.dart';
+import 'package:brightpath/home_page.dart';
+import 'package:brightpath/report_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'excise_home_page.dart';
+import 'package:intl/intl.dart';
+import 'package:brightpath/post_page.dart';
+import 'package:brightpath/prevention_measures_page.dart';
+import 'package:brightpath/profile_page.dart';
 
 class NotificationPage extends StatefulWidget {
   const NotificationPage({super.key});
@@ -16,9 +18,8 @@ class NotificationPage extends StatefulWidget {
 }
 
 class _NotificationPageState extends State<NotificationPage> {
-  int _selectedIndex = 3; // Notifications tab
   int? _hoveredIndex;
-  List<Map<String, dynamic>> _notifications = [];
+  int _selectedIndex = 3; // Notifications tab
 
   @override
   Widget build(BuildContext context) {
@@ -60,14 +61,13 @@ class _NotificationPageState extends State<NotificationPage> {
         child: StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
               .collection('notifications')
-              .where('recipientId', isEqualTo: FirebaseAuth.instance.currentUser?.uid)
-              .where('status', isEqualTo: 'unread')
+              .where('userId', isEqualTo: FirebaseAuth.instance.currentUser?.uid)
+              .where('type', whereIn: ['collaboration_request', 'collaboration_accepted'])
+              .orderBy('timestamp', descending: true)
               .snapshots(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(
-                child: CircularProgressIndicator(),
-              );
+              return const Center(child: CircularProgressIndicator());
             }
 
             if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -75,26 +75,14 @@ class _NotificationPageState extends State<NotificationPage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      Icons.notifications_none_rounded,
-                      size: 80,
-                      color: Colors.blue[200],
-                    ),
+                    Icon(Icons.notifications_none_rounded, size: 80, color: Colors.blue[200]),
                     const SizedBox(height: 16),
                     Text(
-                      'No notifications yet',
+                      'No notifications',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w600,
                         color: Colors.blue[600],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'You\'ll see your notifications here',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey[600],
                       ),
                     ),
                   ],
@@ -102,123 +90,29 @@ class _NotificationPageState extends State<NotificationPage> {
               );
             }
 
-            final requests = snapshot.data!.docs;
-
             return ListView.builder(
               padding: const EdgeInsets.all(16),
-              itemCount: requests.length,
+              itemCount: snapshot.data!.docs.length,
               itemBuilder: (context, index) {
-                final request = requests[index].data() as Map<String, dynamic>;
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.blue[100]!.withOpacity(0.3),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      ListTile(
-                        contentPadding: const EdgeInsets.all(16),
-                        leading: CircleAvatar(
-                          radius: 30,
-                          backgroundColor: Colors.blue[50],
-                          backgroundImage: request['profilePicturePath'] != null
-                              ? NetworkImage(request['profilePicturePath'])
-                              : null,
-                          child: request['profilePicturePath'] == null
-                              ? Icon(Icons.person, color: Colors.blue[600])
-                              : null,
-                        ),
-                        title: Text(
-                          request['senderName'] ?? 'Unknown User',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 8),
-                            Text(
-                              'Sent you a collaboration request',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Tap to respond',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.blue[600],
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.blue[50],
-                          borderRadius: const BorderRadius.only(
-                            bottomLeft: Radius.circular(16),
-                            bottomRight: Radius.circular(16),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: TextButton.icon(
-                                onPressed: () => _acceptCollaboration(request),
-                                icon: const Icon(Icons.check_circle_outline),
-                                label: const Text('Accept'),
-                                style: TextButton.styleFrom(
-                                  foregroundColor: Colors.green[700],
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  shape: const RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.only(
-                                      bottomLeft: Radius.circular(16),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            Container(
-                              width: 1,
-                              height: 32,
-                              color: Colors.blue[100],
-                            ),
-                            Expanded(
-                              child: TextButton.icon(
-                                onPressed: () => _handleReject(request),
-                                icon: const Icon(Icons.cancel_outlined),
-                                label: const Text('Decline'),
-                                style: TextButton.styleFrom(
-                                  foregroundColor: Colors.red[700],
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  shape: const RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.only(
-                                      bottomRight: Radius.circular(16),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                );
+                final notification = snapshot.data!.docs[index].data() as Map<String, dynamic>;
+                final notificationId = snapshot.data!.docs[index].id;
+                
+                if (notification['type'] == 'collaboration_accepted') {
+                  return _buildNotificationCard(
+                    title: notification['title'],
+                    message: notification['message'],
+                    timestamp: notification['timestamp'] as Timestamp,
+                    icon: Icons.check_circle,
+                    color: Colors.green[700]!,
+                    onDismiss: () => _markNotificationAsRead(notificationId),
+                  );
+                } else if (notification['type'] == 'collaboration_request') {
+                  return _buildCollaborationRequestCard(
+                    {...notification, 'notificationId': notificationId}
+                  );
+                }
+                
+                return const SizedBox.shrink();
               },
             );
           },
@@ -229,35 +123,57 @@ class _NotificationPageState extends State<NotificationPage> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.2),
-              spreadRadius: 1,
-              blurRadius: 10,
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 20,
+              offset: const Offset(0, -5),
             ),
           ],
         ),
-        child: MouseRegion(
-          onEnter: (event) {
-            setState(() {
-              _hoveredIndex = null;
-            });
-          },
-          onExit: (event) {
-            setState(() {
-              _hoveredIndex = null;
-            });
-          },
-          child: BottomNavigationBar(
-            items: _buildNavItems(),
-            currentIndex: _selectedIndex,
-            selectedItemColor: Colors.blue[700],
-            unselectedItemColor: Colors.grey[400],
-            showUnselectedLabels: true,
-            type: BottomNavigationBarType.fixed,
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            selectedFontSize: 12,
-            unselectedFontSize: 12,
-            onTap: _onItemTapped,
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.blue.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
+              ),
+              child: MouseRegion(
+                onHover: (event) {
+                  final RenderBox box = context.findRenderObject() as RenderBox;
+                  final position = box.globalToLocal(event.position);
+                  final width = box.size.width;
+                  final index = (position.dx / (width / 6)).floor();
+                  setState(() {
+                    _hoveredIndex = index;
+                  });
+                },
+                onExit: (event) {
+                  setState(() {
+                    _hoveredIndex = null;
+                  });
+                },
+                child: BottomNavigationBar(
+                  items: _buildNavItems(),
+                  currentIndex: _selectedIndex,
+                  selectedItemColor: Colors.blue[700],
+                  unselectedItemColor: Colors.grey[400],
+                  showUnselectedLabels: true,
+                  type: BottomNavigationBarType.fixed,
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  selectedFontSize: 12,
+                  unselectedFontSize: 12,
+                  onTap: _onItemTapped,
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -358,99 +274,88 @@ class _NotificationPageState extends State<NotificationPage> {
     }
   }
 
-  Future<void> _acceptCollaboration(Map<String, dynamic> notification) async {
+  Future<void> _handleAccept(Map<String, dynamic> request) async {
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
-
-      // Get the notification document ID
-      final notificationId = notification['id'];
-      if (notificationId == null) {
-        throw Exception('Notification ID is missing');
-      }
-
-      // Get user data for the current user
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
+      // Get the request document reference
+      final requestQuery = await FirebaseFirestore.instance
+          .collection('collaborationRequests')
+          .where('senderId', isEqualTo: request['senderId'])
+          .where('receiverId', isEqualTo: FirebaseAuth.instance.currentUser?.uid)
+          .where('status', isEqualTo: 'pending')
           .get();
-      
-      final currentUserName = userDoc.data()?['name'] ?? 'Anonymous';
 
-      // Get the community document reference
-      final communityRef = FirebaseFirestore.instance
-          .collection('communities')
-          .doc(notification['communityId']);
+      if (requestQuery.docs.isEmpty) {
+        throw Exception('Request not found');
+      }
 
-      // Add user to collaborators collection
-      await communityRef.collection('collaborators').doc(notification['senderId']).set({
-        'userId': notification['senderId'],
-        'userName': notification['senderName'],
-        'joinedAt': FieldValue.serverTimestamp(),
-        'status': 'active',
+      final requestDoc = requestQuery.docs.first;
+
+      // Update request status to accepted
+      await requestDoc.reference.update({
+        'status': 'accepted',
+        'acceptedAt': FieldValue.serverTimestamp(),
       });
 
-      // Remove the notification
-      await FirebaseFirestore.instance
-          .collection('notifications')
-          .doc(notificationId)
-          .delete();
+      // Create collaboration record
+      await FirebaseFirestore.instance.collection('collaborations').add({
+        'user1Id': request['senderId'],
+        'user1Name': request['senderName'],
+        'user2Id': FirebaseAuth.instance.currentUser?.uid,
+        'user2Name': request['receiverName'],
+        'createdAt': FieldValue.serverTimestamp(),
+        'status': 'active'
+      });
 
-      // Send acceptance notification to the requester
+      // Create notification for sender
       await FirebaseFirestore.instance.collection('notifications').add({
+        'userId': request['senderId'],
+        'title': 'Collaboration Request Accepted',
+        'message': '${request['receiverName']} has accepted your collaboration request',
         'type': 'collaboration_accepted',
-        'senderId': user.uid,
-        'senderName': currentUserName,
-        'recipientId': notification['senderId'],
-        'communityId': notification['communityId'],
-        'communityName': notification['communityName'],
-        'timestamp': FieldValue.serverTimestamp(),
         'status': 'unread',
-        'message': '$currentUserName accepted your collaboration request for ${notification['communityName']}',
+        'timestamp': FieldValue.serverTimestamp(),
       });
 
-      // Show success message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.green[100]),
-                const SizedBox(width: 12),
-                const Text('Request accepted successfully'),
-              ],
-            ),
-            backgroundColor: Colors.green[700],
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            margin: const EdgeInsets.all(16),
-            duration: const Duration(seconds: 2),
-          ),
-        );
+      // Mark the request notification as read
+      if (request['notificationId'] != null) {
+        await _markNotificationAsRead(request['notificationId']);
       }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.green[100]),
+              const SizedBox(width: 12),
+              const Text('Request accepted successfully'),
+            ],
+          ),
+          backgroundColor: Colors.green[700],
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
     } catch (e) {
-      print('Error accepting collaboration: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.error, color: Colors.red[100]),
-                const SizedBox(width: 12),
-                const Text('Failed to accept request'),
-              ],
-            ),
-            backgroundColor: Colors.red[700],
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            margin: const EdgeInsets.all(16),
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.error, color: Colors.red[100]),
+              const SizedBox(width: 12),
+              const Text('Failed to accept request'),
+            ],
           ),
-        );
-      }
+          backgroundColor: Colors.red[700],
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
     }
   }
 
@@ -492,6 +397,187 @@ class _NotificationPageState extends State<NotificationPage> {
           margin: const EdgeInsets.all(16),
         ),
       );
+    }
+  }
+
+  Widget _buildNotificationCard({
+    required String title,
+    required String message,
+    required Timestamp timestamp,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onDismiss,
+  }) {
+    return Dismissible(
+      key: Key(timestamp.toString()),
+      onDismissed: (_) => onDismiss(),
+      background: Container(
+        color: Colors.red[100],
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        child: Icon(Icons.delete, color: Colors.red[700]),
+      ),
+      child: Card(
+        elevation: 2,
+        margin: const EdgeInsets.only(bottom: 16),
+        child: ListTile(
+          leading: Icon(icon, color: color),
+          title: Text(title),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(message),
+              Text(
+                _formatTimestamp(timestamp),
+                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatTimestamp(Timestamp timestamp) {
+    final now = DateTime.now();
+    final date = timestamp.toDate();
+    final difference = now.difference(date);
+
+    if (difference.inDays > 0) {
+      return DateFormat('MMM d, yyyy').format(date);
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours} hours ago';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes} minutes ago';
+    } else {
+      return 'Just now';
+    }
+  }
+
+  Widget _buildCollaborationRequestCard(Map<String, dynamic> request) {
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.blue[100]!.withOpacity(0.3),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      ListTile(
+                        contentPadding: const EdgeInsets.all(16),
+                        leading: CircleAvatar(
+                          radius: 30,
+                          backgroundColor: Colors.blue[50],
+                          backgroundImage: request['profilePicturePath'] != null
+                              ? NetworkImage(request['profilePicturePath'])
+                              : null,
+                          child: request['profilePicturePath'] == null
+                              ? Icon(Icons.person, color: Colors.blue[600])
+                              : null,
+                        ),
+                        title: Text(
+                          request['senderName'] ?? 'Unknown User',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 8),
+                            Text(
+                              'Sent you a collaboration request',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Tap to respond',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.blue[600],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.blue[50],
+                          borderRadius: const BorderRadius.only(
+                            bottomLeft: Radius.circular(16),
+                            bottomRight: Radius.circular(16),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: TextButton.icon(
+                                onPressed: () => _handleAccept(request),
+                                icon: const Icon(Icons.check_circle_outline),
+                                label: const Text('Accept'),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: Colors.green[700],
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  shape: const RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.only(
+                                      bottomLeft: Radius.circular(16),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Container(
+                              width: 1,
+                              height: 32,
+                              color: Colors.blue[100],
+                            ),
+                            Expanded(
+                              child: TextButton.icon(
+                                onPressed: () => _handleReject(request),
+                                icon: const Icon(Icons.cancel_outlined),
+                                label: const Text('Decline'),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: Colors.red[700],
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  shape: const RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.only(
+                                      bottomRight: Radius.circular(16),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+      ),
+    );
+  }
+
+  Future<void> _markNotificationAsRead(String notificationId) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('notifications')
+          .doc(notificationId)
+          .update({
+        'status': 'read',
+        'readAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print('Error marking notification as read: $e');
     }
   }
 }
