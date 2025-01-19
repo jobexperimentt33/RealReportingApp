@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:brightpath/excise_home_page.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -55,47 +56,81 @@ class _LoginPageState extends State<LoginPage> {
         );
         
         if (userCredential.user != null) {
-          // Reload the user to get the latest email verification status
           await userCredential.user!.reload();
           User? user = _auth.currentUser;
 
           if (user != null && user.emailVerified) {
-            // User is verified in Firebase Auth, update Firestore
-            await FirebaseFirestore.instance
+            // First, query Firestore using email
+            final querySnapshot = await FirebaseFirestore.instance
                 .collection('users')
-                .doc(user.uid)
-                .set({'verified': true}, SetOptions(merge: true));
-                
-            // Show success message and wait for it to be displayed
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Row(
-                  children: [
-                    Icon(Icons.check_circle, color: Colors.white),
-                    SizedBox(width: 12),
-                    Text('Login successful!'),
-                  ],
+                .where('email', isEqualTo: _emailController.text.trim())
+                .get();
+
+            if (querySnapshot.docs.isNotEmpty) {
+              final userData = querySnapshot.docs.first.data();
+              
+              // Update verified status
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(querySnapshot.docs.first.id)
+                  .set({'verified': true}, SetOptions(merge: true));
+                  
+              // Show success message
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Row(
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.white),
+                      SizedBox(width: 12),
+                      Text('Login successful!'),
+                    ],
+                  ),
+                  backgroundColor: Colors.green,
+                  duration: Duration(seconds: 2),
+                  behavior: SnackBarBehavior.floating,
                 ),
-                backgroundColor: Colors.green,
-                duration: Duration(seconds: 2),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
+              );
 
-            // Wait for 2 seconds to show the success message
-            await Future.delayed(const Duration(seconds: 2));
+              // Wait for 2 seconds to show the success message
+              await Future.delayed(const Duration(seconds: 2));
 
-            // Navigate to post page only after showing success message
-            if (mounted) {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const PostPage(initialPostIndex: 0)),
+              // Navigate based on user category
+              if (mounted) {
+                final userCategory = userData['category'] as String?;
+
+                // For debugging - show the user data
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('User Data: ${userData.toString()}'),
+                    backgroundColor: Colors.blue,
+                    duration: const Duration(seconds: 3),
+                  ),
+                );
+
+                if (userCategory == 'excise') {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ExciseHomePage()),
+                  );
+                } else {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const PostPage(initialPostIndex: 0)),
+                  );
+                }
+              }
+            } else {
+              // No user document found with this email
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('User data not found'),
+                  backgroundColor: Colors.red,
+                ),
               );
             }
           } else if (user != null) {
-            // Send verification email if not verified
+            // Handle unverified email case...
             await userCredential.user!.sendEmailVerification();
-            // Show verification dialog
             await showDialog(
               context: context,
               builder: (BuildContext context) {
@@ -104,9 +139,7 @@ class _LoginPageState extends State<LoginPage> {
                   content: const Text('Please verify your email address. A verification link has been sent to your email.'),
                   actions: [
                     TextButton(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
+                      onPressed: () => Navigator.of(context).pop(),
                       child: const Text('OK'),
                     ),
                   ],
@@ -116,7 +149,7 @@ class _LoginPageState extends State<LoginPage> {
           }
         }
       } catch (e) {
-        // Show error dialog
+        // Show error dialog...
         await showDialog(
           context: context,
           builder: (BuildContext context) {
@@ -125,9 +158,7 @@ class _LoginPageState extends State<LoginPage> {
               content: Text(_getReadableErrorMessage(e.toString())),
               actions: [
                 TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
+                  onPressed: () => Navigator.of(context).pop(),
                   child: const Text('OK'),
                 ),
               ],
@@ -148,15 +179,38 @@ class _LoginPageState extends State<LoginPage> {
         idToken: googleAuth?.idToken,
       );
 
-      await _auth.signInWithCredential(credential);
-      // Navigate to profile page
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const PostPage(initialPostIndex: 0,)),
-      );
+      final userCredential = await _auth.signInWithCredential(credential);
+      
+      // Check user role in Firestore
+      if (userCredential.user != null) {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userCredential.user!.uid)
+            .get();
+
+        final userData = userDoc.data();
+        final userRole = userData?['category'] as String?;
+
+        if (userRole == 'excise') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const ExciseHomePage()),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const PostPage(initialPostIndex: 0)),
+          );
+        }
+      }
     } catch (e) {
-      // Handle error (e.g., show a dialog)
-      print(e);
+      print('Google Sign In Error: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to sign in with Google: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -236,11 +290,52 @@ class _LoginPageState extends State<LoginPage> {
       await userDocRef.set({'verified': true}, SetOptions(merge: true)); // Update verified field to true
 
       if (user != null && user.emailVerified) {
+
+        final querySnapshot = await FirebaseFirestore.instance
+                .collection('users')
+                .where('email', isEqualTo: _emailController.text.trim())
+                .get();
+
+            if (querySnapshot.docs.isNotEmpty) {
+              final userData = querySnapshot.docs.first.data();
+              
+              // Update verified status
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(querySnapshot.docs.first.id)
+                  .set({'verified': true}, SetOptions(merge: true));
+                  
+              // Show success message
+              
+
+              // Wait for 2 seconds to show the success message
+              await Future.delayed(const Duration(seconds: 2));
+
+              // Navigate based on user category
+              if (mounted) {
+                final userCategory = userData['category'] as String?;
+
+                // For debugging - show the user dat
+
+                if (userCategory == 'excise') {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ExciseHomePage()),
+                  );
+                } else {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const PostPage(initialPostIndex: 0)),
+                  );
+                }
+              }
+            }
+      
         // Navigate to profile page
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const PostPage(initialPostIndex: 0,)),
-        );
+        // Navigator.pushReplacement(
+        //   context,
+        //   MaterialPageRoute(builder: (context) => const PostPage(initialPostIndex: 0,)),
+        // );
       } else {
         // Optionally, show a message that the user is still not verified
         ScaffoldMessenger.of(context).showSnackBar(

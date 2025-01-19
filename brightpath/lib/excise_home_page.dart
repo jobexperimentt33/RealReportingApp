@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:brightpath/excise_report.dart';
+import 'package:brightpath/excise_profile_page.dart';
+import 'package:brightpath/notification_page.dart';
 
 class ExciseHomePage extends StatefulWidget {
   const ExciseHomePage({super.key});
@@ -106,6 +109,19 @@ class _ExciseHomePageState extends State<ExciseHomePage> {
                   Icons.edit_note,
                   () {
                     // Navigate to manage posts page
+                  },
+                ),
+                const SizedBox(height: 16),
+                _buildActionButton(
+                  'View Reports',
+                  Icons.report_outlined,
+                  () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ExciseReportPage(),
+                      ),
+                    );
                   },
                 ),
 
@@ -363,7 +379,33 @@ class _ExciseHomePageState extends State<ExciseHomePage> {
     setState(() {
       _selectedIndex = index;
     });
-    // Add navigation logic here
+    
+    switch (index) {
+      case 0:
+        // Already on home page
+        break;
+      case 1:
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const ExciseReportPage()),
+        );
+        break;
+      case 2:
+        // Navigate to Post page (implement later)
+        break;
+      case 3:
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const NotificationPage()),
+        );
+        break;
+      case 4:
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const ExciseProfilePage()),
+        );
+        break;
+    }
   }
 }
 

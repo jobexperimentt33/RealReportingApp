@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'login_page.dart';
+import 'package:brightpath/excise_report.dart';
 
 class ExciseProfilePage extends StatefulWidget {
   const ExciseProfilePage({super.key});
@@ -376,7 +377,12 @@ class _ExciseProfilePageState extends State<ExciseProfilePage> {
                   'View Reported Regions',
                   Icons.location_on_outlined,
                   () {
-                    // Navigate to reported regions page
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ExciseReportPage(),
+                      ),
+                    );
                   },
                 ),
                 const SizedBox(height: 16),
@@ -758,7 +764,36 @@ class _ExciseProfilePageState extends State<ExciseProfilePage> {
     setState(() {
       _selectedIndex = index;
     });
-    // Add navigation logic here
+    
+    switch (index) {
+      case 0:
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const ExciseReportPage()),
+        );
+        break;
+      case 1:
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const ExciseReportPage()),
+        );
+        break;
+      case 2:
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const ExciseReportPage()),
+        );
+        break;
+      case 3:
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const ExciseReportPage()),
+        );
+        break;
+      case 4:
+        // Already on profile page
+        break;
+    }
   }
 
   Widget _buildActionButton(String title, IconData icon, VoidCallback onPressed) {
