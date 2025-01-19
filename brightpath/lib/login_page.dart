@@ -99,13 +99,13 @@ class _LoginPageState extends State<LoginPage> {
                 final userCategory = userData['category'] as String?;
 
                 // For debugging - show the user data
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('User Data: ${userData.toString()}'),
-                    backgroundColor: Colors.blue,
-                    duration: const Duration(seconds: 3),
-                  ),
-                );
+                // ScaffoldMessenger.of(context).showSnackBar(
+                //   SnackBar(
+                //     content: Text('User Data: ${userData.toString()}'),
+                //     backgroundColor: Colors.blue,
+                //     duration: const Duration(seconds: 3),
+                //   ),
+                // );
 
                 if (userCategory == 'excise') {
                   Navigator.pushReplacement(

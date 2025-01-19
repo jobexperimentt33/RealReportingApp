@@ -75,14 +75,14 @@ class _HotspotRegionState extends State<HotspotRegion> {
                     );
                   },
                 ),
-                const SizedBox(height: 16),
-                _buildActionButton(
-                  'Hotspot Regions',
-                  Icons.warning_amber_rounded,
-                  () {
-                    // Handle hotspot regions
-                  },
-                ),
+                // const SizedBox(height: 16),
+                // _buildActionButton(
+                //   'Hotspot Regions',
+                //   Icons.warning_amber_rounded,
+                //   () {
+                //     // Handle hotspot regions
+                //   },
+                // ),
               ],
             ),
           ),

@@ -10,9 +10,27 @@ class HotspotRegionsViewPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Hotspot Regions'),
+        elevation: 0,
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
+        title: Row(
+          children: [
+            Image.asset(
+              'assets/logo.png',
+              height: 32,
+              errorBuilder: (context, error, stackTrace) => const SizedBox(width: 32),
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              'BrightPath',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
+        ),
       ),
       body: Container(
         decoration: BoxDecoration(

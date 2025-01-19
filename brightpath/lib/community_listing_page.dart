@@ -43,13 +43,13 @@ class _CommunityListingPage extends State<CommunityListingPage> {
         title: Row(
           children: [
             Image.asset(
-              'assets/brightpath_logo.png',
+              'assets/logo.png',
               height: 32,
               errorBuilder: (context, error, stackTrace) => const SizedBox(width: 32),
             ),
             const SizedBox(width: 12),
             const Text(
-              'Communitis',
+              'Communities',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.w600,

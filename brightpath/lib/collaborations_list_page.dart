@@ -70,7 +70,7 @@ class _CollaborationsListPageState extends State<CollaborationsListPage> {
         title: Row(
           children: [
             Image.asset(
-              'assets/brightpath_logo.png',
+              'assets/logo.png',
               height: 32,
               errorBuilder: (context, error, stackTrace) => const SizedBox(width: 32),
             ),
