@@ -23,12 +23,23 @@ class _ExciseReportPageState extends State<ExciseReportPage> {
         elevation: 0,
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
-        title: const Text(
-          'Excise Reports',
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w600,
-          ),
+        title: Row(
+          children: [
+            Image.asset(
+              'assets/logo.png',
+              height: 32,
+              errorBuilder: (context, error, stackTrace) => const SizedBox(width: 32),
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              'BrightPath',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
         ),
       ),
       body: Container(
@@ -195,31 +206,37 @@ class _ExciseReportPageState extends State<ExciseReportPage> {
   void _onItemTapped(int index) {
     if (index == _selectedIndex) return;
     
-    Widget page;
     switch (index) {
       case 0:
-        page = const ExciseHomePage();
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const ExciseHomePage()),
+        );
         break;
       case 1:
         // Already on report page
         return;
       case 2:
-        page = const NotificationPage();
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const NotificationPage()),
+        );
         break;
       case 3:
-        page = const NotificationPage();
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const NotificationPage()),
+        );
         break;
       case 4:
-        page = const ExciseProfilePage();
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const ExciseProfilePage()),
+        );
         break;
       default:
         return;
     }
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => page),
-    );
   }
 
   Widget _buildOptionCard(

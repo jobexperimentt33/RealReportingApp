@@ -27,11 +27,13 @@ class _ExciseProfilePageState extends State<ExciseProfilePage> {
   String? _badgeNumber;
   String? _district;
   String? _profileImageUrl;
+  List<Map<String, dynamic>> _posts = [];
 
   @override
   void initState() {
     super.initState();
     _loadOfficerData();
+    _loadPosts();
   }
 
   Future<void> _loadOfficerData() async {
@@ -52,6 +54,27 @@ class _ExciseProfilePageState extends State<ExciseProfilePage> {
       }
     } catch (e) {
       print('Error loading officer data: $e');
+    }
+  }
+
+  Future<void> _loadPosts() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('excisePosts')
+          .where('officerId', isEqualTo: _auth.currentUser!.uid)
+          .orderBy('timestamp', descending: true)
+          .get();
+
+      setState(() {
+        _posts = snapshot.docs
+            .map((doc) => {
+                  'id': doc.id,
+                  ...doc.data(),
+                })
+            .toList();
+      });
+    } catch (e) {
+      print('Error loading posts: $e');
     }
   }
 
@@ -401,6 +424,13 @@ class _ExciseProfilePageState extends State<ExciseProfilePage> {
 
                 // Recent Activity
                 _buildRecentActivitySection(),
+
+                // Posts Section
+                _buildPostsGrid(),
+                const SizedBox(height: 24),
+
+                // Manage Posts Button
+                _buildManagePostsButton(),
               ],
             ),
           ),
@@ -647,6 +677,150 @@ class _ExciseProfilePageState extends State<ExciseProfilePage> {
     );
   }
 
+  Widget _buildPostsGrid() {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        crossAxisSpacing: 4,
+        mainAxisSpacing: 4,
+      ),
+      itemCount: _posts.length,
+      itemBuilder: (context, index) {
+        final post = _posts[index];
+        return GestureDetector(
+          onLongPress: () => _deletePost(post['id']),
+          child: Image.network(
+            post['imageUrl'],
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) =>
+                Container(
+                  color: Colors.grey[200],
+                  child: Icon(Icons.error, color: Colors.grey[400]),
+                ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildManagePostsButton() {
+    return ElevatedButton.icon(
+      onPressed: _addNewPost,
+      icon: const Icon(Icons.add_photo_alternate),
+      label: const Text('Add New Post'),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.blue[600],
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _addNewPost() async {
+    try {
+      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+      if (image == null) return;
+
+      setState(() => _isLoading = true);
+
+      // Upload image to Firebase Storage
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('excisePosts')
+          .child('${DateTime.now().millisecondsSinceEpoch}.jpg');
+
+      await storageRef.putFile(File(image.path));
+      final downloadUrl = await storageRef.getDownloadURL();
+
+      // Add post to Firestore
+      await FirebaseFirestore.instance.collection('excisePosts').add({
+        'officerId': _auth.currentUser!.uid,
+        'officerName': _officerName,
+        'imageUrl': downloadUrl,
+        'timestamp': FieldValue.serverTimestamp(),
+        'description': '', // You can add a description input if needed
+      });
+
+      await _loadPosts(); // Reload posts
+
+      setState(() => _isLoading = false);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.green[100]),
+                const SizedBox(width: 12),
+                const Text('Post added successfully'),
+              ],
+            ),
+            backgroundColor: Colors.green[600],
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to add post: $e'),
+            backgroundColor: Colors.red[600],
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _deletePost(String postId) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('excisePosts')
+          .doc(postId)
+          .delete();
+
+      await _loadPosts(); // Reload posts
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.green[100]),
+                const SizedBox(width: 12),
+                const Text('Post deleted successfully'),
+              ],
+            ),
+            backgroundColor: Colors.green[600],
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete post: $e'),
+            backgroundColor: Colors.red[600],
+          ),
+        );
+      }
+    }
+  }
+
   Widget _buildBottomNavBar() {
     return Container(
       decoration: BoxDecoration(
@@ -849,4 +1023,92 @@ class NavItem {
   final String label;
 
   NavItem(this.selectedIcon, this.icon, this.label);
+}
+
+class UpdateProfileDialog extends StatefulWidget {
+  final String currentName;
+  final String currentDesignation;
+  final String currentBadgeNumber;
+  final String currentDistrict;
+
+  const UpdateProfileDialog({
+    super.key,
+    required this.currentName,
+    required this.currentDesignation,
+    required this.currentBadgeNumber,
+    required this.currentDistrict,
+  });
+
+  @override
+  State<UpdateProfileDialog> createState() => _UpdateProfileDialogState();
+}
+
+class _UpdateProfileDialogState extends State<UpdateProfileDialog> {
+  late TextEditingController _nameController;
+  late TextEditingController _designationController;
+  late TextEditingController _badgeNumberController;
+  late TextEditingController _districtController;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.currentName);
+    _designationController = TextEditingController(text: widget.currentDesignation);
+    _badgeNumberController = TextEditingController(text: widget.currentBadgeNumber);
+    _districtController = TextEditingController(text: widget.currentDistrict);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Update Profile'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(labelText: 'Name'),
+            ),
+            TextField(
+              controller: _designationController,
+              decoration: const InputDecoration(labelText: 'Designation'),
+            ),
+            TextField(
+              controller: _badgeNumberController,
+              decoration: const InputDecoration(labelText: 'Badge Number'),
+            ),
+            TextField(
+              controller: _districtController,
+              decoration: const InputDecoration(labelText: 'District'),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, {
+            'name': _nameController.text,
+            'designation': _designationController.text,
+            'badgeNumber': _badgeNumberController.text,
+            'district': _districtController.text,
+          }),
+          child: const Text('Update'),
+        ),
+      ],
+    );
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _designationController.dispose();
+    _badgeNumberController.dispose();
+    _districtController.dispose();
+    super.dispose();
+  }
 }

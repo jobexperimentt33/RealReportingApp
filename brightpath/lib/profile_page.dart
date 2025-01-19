@@ -478,6 +478,7 @@ class _ProfilePageState extends State<ProfilePage> {
         appBar: AppBar(
           elevation: 0,
           backgroundColor: Colors.white,
+          foregroundColor: Colors.black87,
           leading: IconButton(
             icon: Icon(Icons.arrow_back_ios, color: Colors.blue[700]),
             onPressed: () {
@@ -521,21 +522,25 @@ class _ProfilePageState extends State<ProfilePage> {
               }
             },
           ),
-          title: const Text(
-            'Profile',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
-            ),
+          title: Row(
+            children: [
+              Image.asset(
+                'assets/logo.png',
+                height: 32,
+                errorBuilder: (context, error, stackTrace) => const SizedBox(width: 32),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Profile',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
           ),
           actions: [
-            IconButton(
-              icon: Icon(Icons.settings_outlined, color: Colors.blue[700]),
-              onPressed: () {
-                // Handle settings
-              },
-            ),
             IconButton(
               icon: Icon(Icons.logout_rounded, color: Colors.blue[700]),
               onPressed: _showLogoutDialog,
