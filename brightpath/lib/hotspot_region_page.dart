@@ -4,6 +4,8 @@ import 'package:brightpath/community_page.dart';
 import 'package:brightpath/profile_page.dart';
 import 'package:brightpath/report_page.dart';
 import 'package:brightpath/prevention_measures_page.dart';
+import 'package:brightpath/hostspot_regions_view.dart';
+
 class HotspotRegion extends StatefulWidget {
   const HotspotRegion({super.key});
 
@@ -62,10 +64,15 @@ class _HotspotRegionState extends State<HotspotRegion> {
                 _buildInfoCard(),
                 const SizedBox(height: 24),
                 _buildActionButton(
-                  'View Reported Regions',
-                  Icons.map_outlined,
+                  'View Hotspot Regions',
+                  Icons.warning_amber_rounded,
                   () {
-                    // Handle view reported regions
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const HotspotRegionsViewPage(),
+                      ),
+                    );
                   },
                 ),
                 const SizedBox(height: 16),

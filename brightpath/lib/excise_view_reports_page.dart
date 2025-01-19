@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:rxdart/rxdart.dart';
 
 class ViewReportsPage extends StatefulWidget {
   const ViewReportsPage({super.key});
@@ -13,6 +14,7 @@ class ViewReportsPage extends StatefulWidget {
 class _ViewReportsPageState extends State<ViewReportsPage> {
   String _selectedFilter = 'pending';
   String? _selectedDistrict;
+  String _selectedReportType = 'all'; // 'all', 'location', 'known_person'
 
   @override
   void initState() {
@@ -41,10 +43,25 @@ class _ViewReportsPageState extends State<ViewReportsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('User Reports'),
+        title: const Text('Reports Overview'),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
         actions: [
+          // Report Type Filter
+          DropdownButton<String>(
+            value: _selectedReportType,
+            items: [
+              DropdownMenuItem(value: 'all', child: Text('All Reports')),
+              DropdownMenuItem(value: 'location', child: Text('Location Reports')),
+              DropdownMenuItem(value: 'known_person', child: Text('Known Person Reports')),
+            ],
+            onChanged: (value) {
+              setState(() {
+                _selectedReportType = value!;
+              });
+            },
+          ),
+          // Status Filter
           PopupMenuButton<String>(
             onSelected: (value) {
               setState(() {
@@ -52,177 +69,36 @@ class _ViewReportsPageState extends State<ViewReportsPage> {
               });
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'pending',
-                child: Text('Pending Reports'),
-              ),
-              const PopupMenuItem(
-                value: 'accepted',
-                child: Text('Accepted Reports'),
-              ),
-              const PopupMenuItem(
-                value: 'rejected',
-                child: Text('Rejected Reports'),
-              ),
+              const PopupMenuItem(value: 'pending', child: Text('Pending')),
+              const PopupMenuItem(value: 'accepted', child: Text('Accepted')),
+              const PopupMenuItem(value: 'rejected', child: Text('Rejected')),
             ],
           ),
         ],
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('userReports')  // Make sure this matches your collection name
-            .where('status', isEqualTo: _selectedFilter)
-            .where('district', isEqualTo: _selectedDistrict)
-            .orderBy('timestamp', descending: true)
-            .snapshots(),
+      body: StreamBuilder<List<QuerySnapshot>>(
+        stream: _getReportsStream(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
 
           if (snapshot.hasError) {
-            return Center(
-              child: Text('Error: ${snapshot.error}'),
-            );
+            return _buildErrorWidget(snapshot.error.toString());
           }
 
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.report_off_outlined, size: 64, color: Colors.grey[400]),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No ${_selectedFilter} reports found',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
-            );
+          final reports = _processReports(snapshot.data);
+          
+          if (reports.isEmpty) {
+            return _buildEmptyStateWidget();
           }
 
           return ListView.builder(
             padding: const EdgeInsets.all(16),
-            itemCount: snapshot.data!.docs.length,
+            itemCount: reports.length,
             itemBuilder: (context, index) {
-              final report = snapshot.data!.docs[index];
-              final data = report.data() as Map<String, dynamic>;
-
-              return Card(
-                margin: const EdgeInsets.only(bottom: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: _getStatusColor(data['status'] ?? 'pending'),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              (data['status'] ?? 'pending').toUpperCase(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            _formatTimestamp(data['timestamp'] as Timestamp),
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Location: ${data['location'] ?? 'Unknown'}',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Description: ${data['description'] ?? 'No description provided'}',
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                      if (data['imageUrls'] != null && (data['imageUrls'] as List).isNotEmpty) ...[
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          height: 100,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: (data['imageUrls'] as List).length,
-                            itemBuilder: (context, imgIndex) {
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: GestureDetector(
-                                  onTap: () => _showFullImage(context, data['imageUrls'][imgIndex]),
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: Image.network(
-                                      data['imageUrls'][imgIndex],
-                                      height: 100,
-                                      width: 100,
-                                      fit: BoxFit.cover,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                      if (_selectedFilter == 'pending')
-                        Padding(
-                          padding: const EdgeInsets.only(top: 16),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              TextButton(
-                                onPressed: () => _handleReportAction(
-                                  context,
-                                  report.id,
-                                  'rejected',
-                                  data['location'],
-                                ),
-                                child: const Text('Reject'),
-                              ),
-                              const SizedBox(width: 16),
-                              ElevatedButton(
-                                onPressed: () => _handleReportAction(
-                                  context,
-                                  report.id,
-                                  'accepted',
-                                  data['location'],
-                                ),
-                                child: const Text('Accept'),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              );
+              final report = reports[index];
+              return _buildReportCard(report);
             },
           );
         },
@@ -230,42 +106,265 @@ class _ViewReportsPageState extends State<ViewReportsPage> {
     );
   }
 
-  Color _getStatusColor(String status) {
-    switch (status) {
-      case 'pending':
-        return Colors.orange;
-      case 'accepted':
-        return Colors.green;
-      case 'rejected':
-        return Colors.red;
-      default:
-        return Colors.grey;
+  Stream<List<QuerySnapshot>> _getReportsStream() {
+    List<Stream<QuerySnapshot>> streams = [];
+
+    if (_selectedReportType == 'all' || _selectedReportType == 'location') {
+      streams.add(
+        FirebaseFirestore.instance
+            .collection('location_reports')
+            .orderBy('timestamp', descending: true)
+            .snapshots()
+      );
     }
+
+    if (_selectedReportType == 'all' || _selectedReportType == 'known_person') {
+      streams.add(
+        FirebaseFirestore.instance
+            .collection('known_person_report')
+            .orderBy('incidentDate', descending: true)
+            .snapshots()
+      );
+    }
+
+    if (streams.isEmpty) {
+      return Stream.value([]);
+    }
+
+    return Rx.combineLatestList(streams);
+  }
+
+  Widget _buildReportCard(Map<String, dynamic> report) {
+    final isLocationReport = report['type'] == 'location';
+    final status = report['status'] ?? 'pending';
+
+    return Card(
+      elevation: 4,
+      margin: const EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Report Header with Status
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isLocationReport ? Colors.blue[100] : Colors.purple[100],
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  isLocationReport ? Icons.location_on : Icons.person,
+                  color: isLocationReport ? Colors.blue[700] : Colors.purple[700],
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  isLocationReport ? 'Location Report' : 'Known Person Report',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: isLocationReport ? Colors.blue[700] : Colors.purple[700],
+                  ),
+                ),
+                const Spacer(),
+                _buildStatusChip(status),
+              ],
+            ),
+          ),
+
+          // Report Content
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (isLocationReport) ...[
+                  _buildInfoRow('Location', report['location']),
+                ] else ...[
+                  _buildInfoRow('Name', report['name']),
+                  _buildInfoRow('Phone', report['phone']),
+                  _buildInfoRow('Address', report['address']),
+                  _buildInfoRow('Location', report['incidentLocation']),
+                  _buildInfoRow('Time', report['incidentTime']),
+                ],
+                _buildInfoRow('Description', isLocationReport ? report['description'] : report['incidentDetails']),
+                _buildInfoRow('Date', _formatTimestamp(report['timestamp'])),
+
+                // Action Buttons
+                Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      OutlinedButton(
+                        onPressed: () => _handleReportAction(
+                          report['id'],
+                          'rejected',
+                          report['location'],
+                          report['type'],
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.red,
+                        ),
+                        child: const Text('Reject'),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton(
+                        onPressed: () => _handleReportAction(
+                          report['id'],
+                          'accepted',
+                          report['location'],
+                          report['type'],
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                        ),
+                        child: const Text('Accept'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              '$label:',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.grey,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 16),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImageGallery(List<dynamic> imageUrls) {
+    return SizedBox(
+      height: 100,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: imageUrls.length,
+        itemBuilder: (context, index) {
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: GestureDetector(
+              onTap: () => _showFullImage(context, imageUrls[index]),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  imageUrls[index],
+                  height: 100,
+                  width: 100,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildStatusChip(String status) {
+    Color chipColor;
+    switch (status.toLowerCase()) {
+      case 'accepted':
+        chipColor = Colors.green;
+        break;
+      case 'rejected':
+        chipColor = Colors.red;
+        break;
+      default:
+        chipColor = Colors.orange;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: chipColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        status.toUpperCase(),
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 12,
+        ),
+      ),
+    );
   }
 
   void _showFullImage(BuildContext context, String imageUrl) {
     showDialog(
       context: context,
       builder: (context) => Dialog(
-        child: Image.network(imageUrl),
+        child: Stack(
+          children: [
+            Image.network(imageUrl),
+            Positioned(
+              right: 8,
+              top: 8,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   String _formatTimestamp(Timestamp timestamp) {
     final date = timestamp.toDate();
-    return DateFormat('MMM d, y HH:mm').format(date);
+    return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
   }
 
   Future<void> _handleReportAction(
-    BuildContext context,
     String reportId,
     String action,
     String location,
+    String reportType,
   ) async {
     try {
+      final collectionName = reportType == 'location' ? 'location_reports' : 'known_person_report';
+      
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        },
+      );
+
+      // Update status in Firebase
       await FirebaseFirestore.instance
-          .collection('userReports')
+          .collection(collectionName)
           .doc(reportId)
           .update({
         'status': action,
@@ -273,27 +372,18 @@ class _ViewReportsPageState extends State<ViewReportsPage> {
         'actionBy': FirebaseAuth.instance.currentUser?.uid,
       });
 
-      if (action == 'accepted') {
-        // Check if this location should be marked as a hotspot
-        final acceptedReports = await FirebaseFirestore.instance
-            .collection('userReports')
-            .where('location', isEqualTo: location)
-            .where('status', isEqualTo: 'accepted')
-            .get();
-
-        if (acceptedReports.docs.length >= 3) {
-          // Create hotspot record
-          await FirebaseFirestore.instance.collection('hotspots').add({
-            'location': location,
-            'district': _selectedDistrict,
-            'createdAt': FieldValue.serverTimestamp(),
-            'status': 'active',
-            'reportCount': acceptedReports.docs.length,
-          });
-        }
+      // Handle hotspot creation for accepted location reports
+      if (action == 'accepted' && reportType == 'location') {
+        await _checkAndCreateHotspot(location);
       }
 
-      if (context.mounted) {
+      // Dismiss loading indicator
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
+      // Show success message
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Report ${action.toUpperCase()}'),
@@ -302,7 +392,11 @@ class _ViewReportsPageState extends State<ViewReportsPage> {
         );
       }
     } catch (e) {
-      if (context.mounted) {
+      // Dismiss loading indicator
+      Navigator.of(context).pop();
+      
+      // Show error message
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: $e'),
@@ -310,6 +404,113 @@ class _ViewReportsPageState extends State<ViewReportsPage> {
           ),
         );
       }
+    }
+  }
+
+  Widget _buildErrorWidget(String error) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
+          const SizedBox(height: 16),
+          Text(
+            'Error loading reports',
+            style: TextStyle(fontSize: 18, color: Colors.grey[800]),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            error,
+            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyStateWidget() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.inbox, size: 48, color: Colors.grey[400]),
+          const SizedBox(height: 16),
+          Text(
+            'No reports found',
+            style: TextStyle(fontSize: 18, color: Colors.grey[800]),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Check back later for new reports',
+            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Map<String, dynamic>> _processReports(List<QuerySnapshot>? snapshots) {
+    if (snapshots == null) return [];
+
+    List<Map<String, dynamic>> allReports = [];
+    
+    for (var snapshot in snapshots) {
+      for (var doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final isLocationReport = doc.reference.parent.id == 'location_reports';
+        
+        // Get status from Firebase or set as pending if not set
+        String status = 'pending';
+        if (data.containsKey('status')) {
+          status = data['status'];
+        }
+        
+        // Create a standardized report object
+        final report = {
+          ...data,
+          'id': doc.id,
+          'type': isLocationReport ? 'location' : 'known_person',
+          'timestamp': isLocationReport ? data['timestamp'] : data['incidentDate'],
+          'description': isLocationReport ? data['description'] : data['incidentDetails'],
+          'location': isLocationReport ? '${data['latitude']}, ${data['longitude']}' : data['incidentLocation'],
+          'status': status,
+        };
+
+        allReports.add(report);
+      }
+    }
+
+    return allReports;
+  }
+
+  Future<void> _checkAndCreateHotspot(String location) async {
+    try {
+      // Check if hotspot already exists
+      final hotspotQuery = await FirebaseFirestore.instance
+          .collection('hotspots')
+          .where('location', isEqualTo: location)
+          .get();
+
+      if (hotspotQuery.docs.isEmpty) {
+        // Create new hotspot
+        await FirebaseFirestore.instance.collection('hotspots').add({
+          'location': location,
+          'createdAt': FieldValue.serverTimestamp(),
+          'reportCount': 1,
+        });
+      } else {
+        // Update existing hotspot
+        await FirebaseFirestore.instance
+            .collection('hotspots')
+            .doc(hotspotQuery.docs.first.id)
+            .update({
+          'reportCount': FieldValue.increment(1),
+          'lastUpdated': FieldValue.serverTimestamp(),
+        });
+      }
+    } catch (e) {
+      print('Error creating/updating hotspot: $e');
     }
   }
 } 
