@@ -10,6 +10,7 @@ import 'event_organization_page.dart';
 import 'institution_listing_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'notification_page.dart';
 import 'collaborations_list_page.dart';
 
 class CommunityPage extends StatefulWidget {
@@ -34,7 +35,7 @@ class _CommunityPageState extends State<CommunityPage> {
         title: Row(
           children: [
             Image.asset(
-              'assets/brightpath_logo.png',
+              'assets/logo.png',
               height: 32,
               errorBuilder: (context, error, stackTrace) => const SizedBox(width: 32),
             ),
@@ -467,7 +468,7 @@ class _CommunityPageState extends State<CommunityPage> {
         Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const ReportPage()));
         break;
       case 3:
-        Navigator.pushReplacementNamed(context, '/notifications');
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const NotificationPage()));
         break;
       case 4:
         Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const ProfilePage()));

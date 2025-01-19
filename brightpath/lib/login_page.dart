@@ -364,6 +364,203 @@ class _LoginPageState extends State<LoginPage> {
     return 'An error occurred during login. Please try again.';
   }
 
+  // Add this method to handle forgot password
+  Future<void> _handleForgotPassword() async {
+    final TextEditingController resetEmailController = TextEditingController();
+    bool isValidEmail = false;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Row(
+                children: [
+                  Icon(Icons.lock_reset, color: Colors.blue[600]),
+                  const SizedBox(width: 8),
+                  const Text('Reset Password'),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Enter your email address and we\'ll send you a link to reset your password.',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                  const SizedBox(height: 20),
+                  TextFormField(
+                    controller: resetEmailController,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: InputDecoration(
+                      labelText: 'Email',
+                      hintText: 'Enter your registered email',
+                      prefixIcon: Icon(Icons.email_outlined, color: Colors.blue[600]),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey[300]!),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.blue[600]!, width: 2),
+                      ),
+                    ),
+                    onChanged: (value) {
+                      setState(() {
+                        final emailRegex = RegExp(r'^[\w-]+(\.[\w-]+)*@([\w-]+\.)+[a-zA-Z]{2,7}$');
+                        isValidEmail = emailRegex.hasMatch(value);
+                      });
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: isValidEmail
+                      ? () async {
+                          try {
+                            Navigator.of(context).pop(); // Close the dialog
+                            _showLoadingDialog('Sending reset link...');
+
+                            await FirebaseAuth.instance.sendPasswordResetEmail(
+                              email: resetEmailController.text.trim(),
+                            );
+
+                            // Dismiss loading dialog
+                            Navigator.of(context).pop();
+
+                            // Show success message
+                            _showSuccessDialog(
+                              'Password Reset Email Sent',
+                              'Check your email for instructions to reset your password. Don\'t forget to check your spam folder.',
+                            );
+                          } catch (e) {
+                            // Dismiss loading dialog if showing
+                            if (Navigator.of(context).canPop()) {
+                              Navigator.of(context).pop();
+                            }
+                            
+                            // Show error dialog with proper error message
+                            _showErrorDialog(
+                              'Reset Password Failed',  // More descriptive title
+                              _getPasswordResetErrorMessage(e.toString()),
+                            );
+                          }
+                        }
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue[700],
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: const Text('Send Reset Link'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Add helper methods for dialogs
+  void _showLoadingDialog(String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return WillPopScope(
+          onWillPop: () async => false,
+          child: AlertDialog(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 20),
+                Text(message),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showSuccessDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.green[600]),
+              const SizedBox(width: 8),
+              Text(title),
+            ],
+          ),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  String _getPasswordResetErrorMessage(String error) {
+    if (error.contains('user-not-found')) {
+      return 'No account found with this email address. Please check and try again.';
+    } else if (error.contains('invalid-email')) {
+      return 'The email address is invalid. Please enter a valid email.';
+    } else if (error.contains('too-many-requests')) {
+      return 'Too many password reset attempts. Please try again later.';
+    }
+    return 'An error occurred while sending the reset link. Please try again later.';
+  }
+
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.error_outline, color: Colors.red[600]),
+              const SizedBox(width: 8),
+              Text(title),
+            ],
+          ),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -544,9 +741,7 @@ class _LoginPageState extends State<LoginPage> {
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton(
-                              onPressed: () {
-                                // Handle forgot password
-                              },
+                              onPressed: _handleForgotPassword,
                               style: TextButton.styleFrom(
                                 foregroundColor: Colors.blue[700],
                                 padding: const EdgeInsets.symmetric(horizontal: 8),
